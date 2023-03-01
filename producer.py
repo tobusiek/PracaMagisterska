@@ -1,4 +1,3 @@
-import asyncio
 import json
 import uuid
 
@@ -17,7 +16,7 @@ request_sender = KafkaProducer(
 )
 
 # Initialize Kafka consumer
-result_sender = KafkaConsumer(
+result_receiver = KafkaConsumer(
     'results_topic',
     bootstrap_servers=['localhost:9092'],
     auto_offset_reset='latest',
@@ -33,6 +32,7 @@ def predict(url: str) -> dict[str, str | int]:
     # Generate unique identifier for the request
     request_id = str(uuid.uuid4())
 
+    # Create data for the request
     data = {'url': url}
 
     # Include unique identifier in message payload
@@ -41,11 +41,10 @@ def predict(url: str) -> dict[str, str | int]:
     # Send message to Kafka topic
     request_sender.send("requests_topic", message)
 
-    # Wait for response on the output_topic
-    for message in result_sender:
+    # Wait for response on the results_topic
+    for message in result_receiver:
         # Extract the response from the message payload
         response = message.value
-        print(response)
 
         # Extract the request ID from the message payload
         response_id = response['request_id']
@@ -58,4 +57,4 @@ def predict(url: str) -> dict[str, str | int]:
 
 if __name__ == '__main__':
     # Start the server
-    uvicorn.run(app, host='127.0.0.1', port=8081)
+    uvicorn.run('producer:app', host='127.0.0.1', port=8081, reload=True)

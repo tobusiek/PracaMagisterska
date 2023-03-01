@@ -1,6 +1,4 @@
-import asyncio
 import json
-import uuid
 
 from kafka import KafkaProducer, KafkaConsumer
 import tensorflow as tf
@@ -49,5 +47,4 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    # asyncio.get_event_loop().run_forever()
     main()
