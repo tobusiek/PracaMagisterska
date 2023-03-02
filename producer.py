@@ -18,12 +18,10 @@ logging.config.fileConfig(os.path.join('resources', 'logging.ini'), disable_exis
 logging.getLogger('kafka').setLevel(logging.ERROR)
 logger = logging.getLogger('debug')
 
-
 # Set up app after setting up logging
 app = FastAPI(debug=True)
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
-
 
 # Initialize Kafka producer
 request_sender = KafkaProducer(
@@ -43,7 +41,7 @@ result_receiver = KafkaConsumer(
 
 
 # Define the endpoint to root
-@app.post('/')
+@app.get('/')
 async def root(request: Request):
     data_input = await request.form()
     logger.info(f'{data_input=}')
@@ -58,12 +56,12 @@ async def get_predict(request: Request):
 
 # Define endpoint to receive data to be predicted
 @app.post('/predict')
-async def post_predict(data: int | str = Form(...)) -> dict[str, str | int]:
+async def post_predict(data_input: int | str = Form(...)) -> dict[str, str | int]:
     # Generate unique identifier for the request
     request_id = str(uuid.uuid4())
 
     # Include unique identifier in message payload
-    message = {'request_id': request_id, 'data': data}
+    message = {'request_id': request_id, 'data': data_input}
 
     # Send message to Kafka topic
     request_sender.send('requests_topic', message)
@@ -75,6 +73,7 @@ async def post_predict(data: int | str = Form(...)) -> dict[str, str | int]:
     return result
 
 
+# Define function to receive result from Kafka topic
 async def receive_result(request_id: str) -> dict[str, str | int]:
     for message in result_receiver:
         # Extract the response from the message payload
