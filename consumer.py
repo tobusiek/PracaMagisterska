@@ -1,8 +1,15 @@
 import json
+import logging
+import logging.config
+import os
 
 from kafka import KafkaProducer, KafkaConsumer
 import tensorflow as tf
 
+# Set up logging
+logging.config.fileConfig(os.path.join('resources', 'logging.ini'), disable_existing_loggers=False)
+logging.getLogger('kafka').setLevel(logging.ERROR)
+logger = logging.getLogger('debug')
 
 # Initialize Kafka producer
 result_sender = KafkaProducer(
@@ -28,16 +35,18 @@ request_receiver = KafkaConsumer(
 def perform_prediction(message: dict) -> None:
     # Extract the data to be predicted from the message payload
     data = message.value
+    logger.debug(f'new data received: {data}')
 
     # Use Tensorflow model to make prediction
     # prediction = model.predict(data)
 
     # Include predicted result and original request ID in message payload
-    # response = {"request_id": message['request_id'], "predicted_result": prediction.tolist()}
-    response = {"request_id": data['request_id'], "predicted_result": data['data']}
+    # response = {'request_id': message['request_id'], 'predicted_result': prediction.tolist()}
+    response = {'request_id': data['request_id'], 'predicted_result': data['data']}
 
     # Send message to Kafka topic
-    result_sender.send("results_topic", response)
+    result_sender.send('results_topic', response)
+    logger.debug(f'result sent to producer: {response}')
 
 
 def main() -> None:

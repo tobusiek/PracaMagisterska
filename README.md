@@ -28,6 +28,7 @@
 ## Kafka setup
 **Installation**
 
+    $ sudo apt install default-jdk
     $ cd /opt/
     $ sudo wget https://dlcdn.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz
     $ sudo tar -xvzf kafka_2.12-3.4.0.tgz
