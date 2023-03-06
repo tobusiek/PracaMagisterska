@@ -1,0 +1,36 @@
+body {
+    background-color: rgb(23, 157, 135);
+    width: 80%;
+    margin-left: 10%;
+    margin-right: -10%;
+    margin-top: 1.5em;
+    font-family: monospace;
+    font-size: 3em;
+}
+
+form {
+    display: block;
+    text-align: center;
+    margin-top: 2.5em;
+}
+
+input[type=text] {
+    width: 100%;
+    border-radius: 15px;
+    margin-top: 1em;
+    padding: 0.5em;
+    font-size: 2rem;
+    vertical-align: center;
+}
+
+input[type=submit] {
+    border: none;
+    border-radius: 15px;
+    color: white;
+    text-decoration: none;
+    margin-left: -4.9em;
+    padding: 0.5em;
+    cursor: pointer;
+    background-color: aquamarine;
+    font-size: 2rem;
+}

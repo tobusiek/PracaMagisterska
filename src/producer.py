@@ -5,7 +5,7 @@ import os
 import uuid
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi import Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +22,7 @@ logger = logging.getLogger('debug')
 app = FastAPI(debug=True)
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
+
 
 # Initialize Kafka producer
 request_sender = KafkaProducer(
@@ -48,6 +49,11 @@ async def root(request: Request):
     return {"data_output": data_input}
 
 
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return FileResponse(os.path.join('static', 'images', 'favicon.svg'))
+
+
 # Define the endpoint to submit a request
 @app.get('/predict', response_class=HTMLResponse)
 async def get_predict(request: Request):
@@ -56,7 +62,7 @@ async def get_predict(request: Request):
 
 # Define endpoint to receive data to be predicted
 @app.post('/predict')
-async def post_predict(data_input: int | str = Form(...)) -> dict[str, str | int]:
+async def post_predict(data_input: int | str = Form(default='')) -> dict[str, str | int]:
     # Generate unique identifier for the request
     request_id = str(uuid.uuid4())
 
