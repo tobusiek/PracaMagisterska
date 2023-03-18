@@ -1,9 +1,11 @@
+import asyncio
 import json
 import logging
 import logging.config
 import os
 
 from kafka import KafkaProducer, KafkaConsumer
+from kafka.consumer.fetcher import ConsumerRecord
 import tensorflow as tf
 
 # Set up logging
@@ -24,7 +26,7 @@ request_receiver = KafkaConsumer(
     auto_offset_reset='latest',
     enable_auto_commit=True,
     group_id='requests-group',
-    value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+    value_deserializer=lambda x: json.loads(x.decode('utf-8')),
 )
 
 # Load Tensorflow model
@@ -32,7 +34,7 @@ request_receiver = KafkaConsumer(
 
 
 # Define function to perform prediction and send response to Kafka output_topic
-def perform_prediction(message: dict) -> None:
+def perform_prediction(message: ConsumerRecord) -> None:
     # Extract the data to be predicted from the message payload
     data = message.value
     logger.debug(f'new data received: {data}')
@@ -56,4 +58,5 @@ def main() -> None:
 
 
 if __name__ == '__main__':
+    logger.info('Consumer started')
     main()

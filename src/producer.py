@@ -5,7 +5,7 @@ import os
 import uuid
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi import Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,11 +42,9 @@ result_receiver = KafkaConsumer(
 
 
 # Define the endpoint to root
-@app.get('/')
+@app.get('/', response_class=HTMLResponse)
 async def root(request: Request):
-    data_input = await request.form()
-    logger.info(f'{data_input=}')
-    return {"data_output": data_input}
+    return RedirectResponse(url='/predict', headers=request.headers)
 
 
 @app.get('/favicon.ico', include_in_schema=False)
