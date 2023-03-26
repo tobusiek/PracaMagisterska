@@ -69,7 +69,7 @@ async def root(request: Request):
 
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon():
-    return FileResponse(os.path.join('static', 'images', 'favicon.svg'))
+    return FileResponse(Path('static', 'images', 'favicon.svg'))
 
 
 # Define the endpoint to submit a request
