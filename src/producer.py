@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import logging.config
-import os
+from pathlib import Path
 import uuid
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from uvicorn import Config, Server
 
 # Set up logging
-logging.config.fileConfig(os.path.join('resources', 'logging.ini'), disable_existing_loggers=False)
+logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
 logging.getLogger('aiokafka').setLevel(logging.ERROR)
 logger = logging.getLogger('debug')
 
