@@ -1,7 +1,16 @@
+# Intructions for freshly installed Ubuntu 22.04 LTS
+
+## Start with updating packages
+```console
+$ sudo apt update && sudo apt upgrade -y
+$ sudo apt-get install ffmpeg
+```
+
+<br>
+
 ## Python setup
 **Instalation**
 ```console
-$ sudo apt update && sudo apt upgrade -y
 $ sudo apt install python3.10
 # verify python version
 $ python3.10 --version

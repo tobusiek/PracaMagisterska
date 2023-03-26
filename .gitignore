@@ -130,3 +130,8 @@ dmypy.json
 
 notes.txt
 kafka-ml/
+stop-fastapi.sh
+model/Data/
+test_audio.mp3
+test_audio.wav
+.vscode
