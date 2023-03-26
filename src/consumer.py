@@ -16,10 +16,11 @@ logger = logging.getLogger('debug')
 # model = tf.keras.models.load_model('my_model.h5')
 
 
-def create_consumer() -> AIOKafkaConsumer:
+async def create_consumer() -> AIOKafkaConsumer:
+    logger.debug('creating consumer')
     return AIOKafkaConsumer(
         'requests_topic',
-        bootstrap_servers='localhost:9092',
+        bootstrap_servers=['localhost:9092'],
         auto_offset_reset='latest',
         enable_auto_commit=True,
         group_id='requests-group',
@@ -28,11 +29,19 @@ def create_consumer() -> AIOKafkaConsumer:
     )
 
 
-def create_producer() -> AIOKafkaProducer:
+async def create_producer() -> AIOKafkaProducer:
+    logger.debug('creating producer...')
     return AIOKafkaProducer(
-        bootstrap_servers='localhost:9092', 
+        bootstrap_servers=['localhost:9092'], 
         value_serializer=lambda x: json.dumps(x).encode('utf-8'),
     )
+
+
+async def stop_kafka(result_sender: AIOKafkaProducer, request_receiver: AIOKafkaConsumer) -> None:
+    await result_sender.stop()
+    logger.debug('stopped producer')
+    await request_receiver.stop()
+    logger.debug('stopped consumer')
 
 
 # Define function to perform prediction and send response to Kafka output_topic
@@ -40,10 +49,8 @@ async def perform_prediction(message, result_sender: AIOKafkaProducer) -> None:
     # Extract the data to be predicted from the message payload
     data = message.value
     logger.debug(f'new data received: {data}, {type(message)}')
-
     # Use Tensorflow model to make prediction
     # prediction = model.predict(data)
-
     # Include predicted result and original request ID in message payload
     # response = {'request_id': message['request_id'], 'predicted_result': prediction.tolist()}
     response = {'request_id': data['request_id'], 'predicted_result': data['data']}
@@ -54,14 +61,18 @@ async def perform_prediction(message, result_sender: AIOKafkaProducer) -> None:
 
 async def main() -> None:
     # Initialize Kafka consumer
-    request_receiver = create_consumer()
+    request_receiver = await create_consumer()
+    logger.debug('request_receiver created')
     # Initialize Kafka producer
-    result_sender = create_producer()
+    result_sender = await create_producer()
+    logger.debug('result_sender created')
     try:
         # Start Kafka producer
         await result_sender.start()
+        logger.debug('result_sender started')
         # Start Kafka consumer
         await request_receiver.start()
+        logger.debug('request_receiver started')
         # Start consumer loop to process incoming messages
         while True:
             message = await request_receiver.getone()
@@ -69,13 +80,10 @@ async def main() -> None:
     except KeyboardInterrupt:
         logger.info('Consumer stopped')
     finally:
-        await request_receiver.stop()
-        await result_sender.stop()
+        await stop_kafka(result_sender, request_receiver)
         quit()
 
 
 if __name__ == '__main__':
     logger.info('Consumer started')
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(main())
-    loop.close()
+    asyncio.run(main())
