@@ -16,8 +16,8 @@ logger = logging.getLogger('debug')
 # model = tf.keras.models.load_model('my_model.h5')
 
 
-async def create_consumer() -> AIOKafkaConsumer:
-    logger.debug('creating consumer')
+async def create_request_receiver() -> AIOKafkaConsumer:
+    logger.debug('creating request_receiver...')
     return AIOKafkaConsumer(
         'requests_topic',
         bootstrap_servers=['localhost:9092'],
@@ -29,19 +29,51 @@ async def create_consumer() -> AIOKafkaConsumer:
     )
 
 
-async def create_producer() -> AIOKafkaProducer:
-    logger.debug('creating producer...')
+async def create_result_sender() -> AIOKafkaProducer:
+    logger.debug('creating result_sender...')
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
         value_serializer=lambda x: json.dumps(x).encode('utf-8'),
     )
 
 
-async def stop_kafka(result_sender: AIOKafkaProducer, request_receiver: AIOKafkaConsumer) -> None:
+async def start_kafka(result_sender: AIOKafkaProducer, request_receiver: AIOKafkaConsumer) -> None:
+    logger.debug('starting kafka...')
+    await asyncio.gather(
+        result_sender.start(),
+        request_receiver.start(),
+    )
+    logger.debug('kafka started!')
+
+
+async def initialize_kafka() -> tuple[AIOKafkaProducer, AIOKafkaConsumer]:
+    logger.debug('initializing kafka...')
+    result_sender, request_receiver = await asyncio.gather(
+        create_result_sender(),
+        create_request_receiver(),
+    )
+    logger.debug('request_receiver and result_sender created')
+    await start_kafka(result_sender, request_receiver)
+    return result_sender, request_receiver
+
+
+async def stop_result_sender(result_sender: AIOKafkaProducer) -> None:
+    logger.debug('stopping result_sender...')
     await result_sender.stop()
-    logger.debug('stopped producer')
+
+
+async def stop_request_receiver(request_receiver: AIOKafkaConsumer) -> None:
+    logger.debug('stopping request_receiver...')
     await request_receiver.stop()
-    logger.debug('stopped consumer')
+
+
+async def stop_kafka(result_sender: AIOKafkaProducer, request_receiver: AIOKafkaConsumer) -> None:
+    logger.debug('stopping kafka...')
+    await asyncio.gather(
+        stop_result_sender(result_sender),
+        stop_request_receiver(request_receiver),
+    )
+    logger.debug('kafka stopped successfully')
 
 
 # Define function to perform prediction and send response to Kafka output_topic
@@ -59,29 +91,13 @@ async def perform_prediction(message, result_sender: AIOKafkaProducer) -> None:
     logger.debug(f'result sent to producer: {response}')
 
 
-async def main() -> None:
-    # Initialize Kafka consumer
-    request_receiver = await create_consumer()
-    logger.debug('request_receiver created')
-    # Initialize Kafka producer
-    result_sender = await create_producer()
-    logger.debug('result_sender created')
-    try:
-        # Start Kafka producer
-        await result_sender.start()
-        logger.debug('result_sender started')
-        # Start Kafka consumer
-        await request_receiver.start()
-        logger.debug('request_receiver started')
-        # Start consumer loop to process incoming messages
-        while True:
-            message = await request_receiver.getone()
-            await perform_prediction(message, result_sender)
-    except KeyboardInterrupt:
-        logger.info('Consumer stopped')
-    finally:
-        await stop_kafka(result_sender, request_receiver)
-        quit()
+async def main() -> None: 
+    result_sender, request_receiver = await initialize_kafka()
+    while True:
+        message = await request_receiver.getone()
+        await perform_prediction(message, result_sender)
+    logger.info('interrupted by user, quitting consumer')
+    await stop_kafka(result_sender, request_receiver)
 
 
 if __name__ == '__main__':

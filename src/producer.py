@@ -29,24 +29,24 @@ request_sender: AIOKafkaProducer = None
 result_receiver: AIOKafkaConsumer = None
 
 
-def create_request_sender() -> AIOKafkaProducer:
-    logger.debug('creating producer...')
+async def create_request_sender() -> AIOKafkaProducer:
+    logger.debug('creating request_sender...')
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
         value_serializer=lambda x: json.dumps(x).encode('utf-8'),
     )
 
 
-def get_request_sender() -> AIOKafkaProducer:
+async def get_request_sender() -> AIOKafkaProducer:
     global request_sender
     if request_sender is None:
-        request_sender = create_request_sender()
+        request_sender = await create_request_sender()
         logger.debug('request_sender created: {request_sender}')
     return request_sender
 
 
-def create_result_receiver() -> AIOKafkaConsumer:
-    logger.debug('creating consumer...')
+async def create_result_receiver() -> AIOKafkaConsumer:
+    logger.debug('creating result_receiver...')
     return AIOKafkaConsumer(
         'results_topic',
         bootstrap_servers=['localhost:9092'],
@@ -58,17 +58,60 @@ def create_result_receiver() -> AIOKafkaConsumer:
     )
 
 
-def get_result_receiver() -> AIOKafkaConsumer:
+async def get_result_receiver() -> AIOKafkaConsumer:
     global result_receiver
     if result_receiver is None:
-        result_receiver = create_result_receiver()
+        result_receiver = await create_result_receiver()
         logger.debug('result_receiver created: {result_receiver}')
     return result_receiver
 
 
-async def stop_kafka(request_sender: AIOKafkaProducer, result_receiver: AIOKafkaConsumer) -> None:
+async def start_kafka() -> None:
+    logger.debug('starting kafka...')
+    await asyncio.gather(
+        request_sender.start(),
+        result_receiver.start(),
+    )
+    logger.debug('kafka started!')
+
+
+async def initialize_kafka() -> None:
+    global result_receiver, request_sender
+    logger.debug('initializing kafka...')
+    request_sender, result_receiver = await asyncio.gather(
+        create_request_sender(),
+        create_result_receiver(),
+    )
+    logger.debug('result_receiver and request_sender created')
+    await start_kafka()
+
+
+async def stop_request_sender() -> None:
+    logger.debug('stopping request_sender...')
     await request_sender.stop()
+
+
+async def stop_result_receiver() -> None:
+    logger.debug('stopping result receiver...')
     await result_receiver.stop()
+
+
+async def stop_kafka() -> None:
+    logger.debug('stopping kafka...')
+    await asyncio.gather(
+        stop_request_sender(),
+        stop_result_receiver(),
+    )
+    logger.debug('kafka stopped succesfully')
+
+
+async def start_server() -> None:
+    loop = asyncio.get_event_loop()
+    config = Config(app, loop=loop, log_level='debug')
+    server = Server(config)
+    logger.debug('starting server...')
+    await server.serve()
+    logger.debug('server started')
 
 
 # Define the endpoint to root
@@ -97,7 +140,7 @@ async def post_predict(data_input: int | str = Form(default='')) -> dict[str, st
     message = {'request_id': request_id, 'data': data_input}
     logger.debug(f'created new message: {message}')
     # Send message to Kafka topic
-    request_sender = get_request_sender()
+    request_sender = await get_request_sender()
     await request_sender.send_and_wait('requests_topic', message)
     await request_sender.flush()
     logger.debug(f'request sent to consumer: {message}')
@@ -108,7 +151,7 @@ async def post_predict(data_input: int | str = Form(default='')) -> dict[str, st
 
 # Define function to receive result from Kafka topic
 async def receive_result(request_id: str) -> dict[str, str | int]:
-    result_receiver = get_result_receiver()
+    result_receiver = await get_result_receiver()
     async for message in result_receiver:
         # Extract the response from the message payload
         response = message.value
@@ -125,24 +168,16 @@ async def receive_result(request_id: str) -> dict[str, str | int]:
 
 
 async def main():
-    global request_sender, result_receiver
-    request_sender = create_request_sender()
-    logger.debug(f'request_sender created {request_sender}')
-    result_receiver = create_result_receiver()
-    logger.debug(f'result_receiver created {result_receiver}')
-    loop = asyncio.get_event_loop()
-    config = Config(app, loop=loop, log_level='debug')
-    server = Server(config)
-    logger.debug('starting server')
-    await server.serve()
+    await initialize_kafka()
+    await start_server()
     while True:
         try:
             ...
         except KeyboardInterrupt:
             logger.info('API interrupted by user')
-            await stop_kafka(request_sender, result_receiver)
-            loop.stop()
-            return
+            await stop_kafka()
+            loop = asyncio.get_event_loop()
+            loop.close()
 
 
 if __name__ == '__main__':
