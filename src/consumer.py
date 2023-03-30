@@ -4,19 +4,23 @@ import logging
 import logging.config
 from pathlib import Path
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+from aiokafka import AIOKafkaProducer, AIOKafkaConsumer, ConsumerStoppedError
+from aiokafka.structs import ConsumerRecord
 import tensorflow as tf
 
-# Set up logging
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
 logging.getLogger('aiokafka').setLevel(logging.ERROR)
 logger = logging.getLogger('debug')
 
-# Load Tensorflow model
+result_sender: AIOKafkaProducer = None
+request_receiver: AIOKafkaConsumer = None
+
 # model = tf.keras.models.load_model('my_model.h5')
 
 
-async def create_request_receiver() -> AIOKafkaConsumer:
+async def _create_request_receiver() -> AIOKafkaConsumer:
+    '''Create AIOKafkaConsumer for receiving requests from producer.'''
+
     logger.debug('creating request_receiver...')
     return AIOKafkaConsumer(
         'requests_topic',
@@ -29,7 +33,9 @@ async def create_request_receiver() -> AIOKafkaConsumer:
     )
 
 
-async def create_result_sender() -> AIOKafkaProducer:
+async def _create_result_sender() -> AIOKafkaProducer:
+    '''Create AIOKafkaProducer for sending prediction results to producer.'''
+
     logger.debug('creating result_sender...')
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
@@ -37,69 +43,135 @@ async def create_result_sender() -> AIOKafkaProducer:
     )
 
 
-async def start_kafka(result_sender: AIOKafkaProducer, request_receiver: AIOKafkaConsumer) -> None:
+async def get_request_receiver() -> AIOKafkaConsumer:
+    '''Get request_receiver (AIOKafkaConsumer), create if not instantiated.'''
+
+    global request_receiver
+    if request_receiver is None:
+        request_receiver = _create_request_receiver()
+        logger.debug('request_receiver created')
+    return request_receiver
+
+
+async def get_result_sender() -> AIOKafkaProducer:
+    '''Get result_sender (AIOKafkaProducer), create if not instantiated.'''
+
+    global result_sender
+    if result_sender is None:
+        result_sender = _create_result_sender()
+        logger.debug('result_sender created')
+    return result_sender
+
+
+async def _start_result_sender() -> None:
+    '''Start result_sender (AIOKafkaProducer).'''
+
+    logger.debug('starting result_sender...')
+    await result_sender.start()
+    logger.debug('result_sender started')
+
+
+async def _start_request_receiver() -> None:
+    '''Start request_receiver (AIOKafkaConsumer).'''
+    
+    logger.debug('starting request_receiver...')
+    await request_receiver.start()
+    logger.debug('request_receiver started')
+    
+
+async def _start_kafka() -> None:
+    '''Start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
+    
     logger.debug('starting kafka...')
     await asyncio.gather(
-        result_sender.start(),
-        request_receiver.start(),
+        _start_result_sender(),
+        _start_request_receiver(),
     )
-    logger.debug('kafka started!')
+    logger.debug('kafka started')
 
 
-async def initialize_kafka() -> tuple[AIOKafkaProducer, AIOKafkaConsumer]:
+async def initialize_kafka() -> None:
+    '''Create and start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
+    
+    global result_sender, request_receiver
     logger.debug('initializing kafka...')
     result_sender, request_receiver = await asyncio.gather(
-        create_result_sender(),
-        create_request_receiver(),
+        _create_result_sender(),
+        _create_request_receiver(),
     )
     logger.debug('request_receiver and result_sender created')
-    await start_kafka(result_sender, request_receiver)
-    return result_sender, request_receiver
+    await _start_kafka()
 
 
-async def stop_result_sender(result_sender: AIOKafkaProducer) -> None:
+async def _stop_result_sender() -> None:
+    '''Stop result_sender (AIOKafkaProducer).'''
+
     logger.debug('stopping result_sender...')
     await result_sender.stop()
 
 
-async def stop_request_receiver(request_receiver: AIOKafkaConsumer) -> None:
+async def _stop_request_receiver() -> None:
+    '''Stop request_receiver (AIOKafkaConsumer).'''
+    
     logger.debug('stopping request_receiver...')
     await request_receiver.stop()
 
 
-async def stop_kafka(result_sender: AIOKafkaProducer, request_receiver: AIOKafkaConsumer) -> None:
+async def stop_kafka() -> None:
+    '''Stop both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
+    
     logger.debug('stopping kafka...')
     await asyncio.gather(
-        stop_result_sender(result_sender),
-        stop_request_receiver(request_receiver),
+        _stop_result_sender(),
+        _stop_request_receiver(),
     )
     logger.debug('kafka stopped successfully')
 
 
-# Define function to perform prediction and send response to Kafka output_topic
-async def perform_prediction(message, result_sender: AIOKafkaProducer) -> None:
-    # Extract the data to be predicted from the message payload
-    data = message.value
-    logger.debug(f'new data received: {data}, {type(message)}')
-    # Use Tensorflow model to make prediction
-    # prediction = model.predict(data)
-    # Include predicted result and original request ID in message payload
-    # response = {'request_id': message['request_id'], 'predicted_result': prediction.tolist()}
-    response = {'request_id': data['request_id'], 'predicted_result': data['data']}
-    # Send message to Kafka topic
+async def _send_prediction_result(request_id: str, prediction_result: str) -> None:
+    '''Send prediction result to server.'''
+    
+    response = {'request_id': request_id, 'predicted_result': prediction_result}
+    result_sender = await get_result_sender()
     await result_sender.send_and_wait('results_topic', response)
     logger.debug(f'result sent to producer: {response}')
 
 
-async def main() -> None: 
-    result_sender, request_receiver = await initialize_kafka()
+async def perform_prediction(message: ConsumerRecord) -> None:
+    '''Perform prediction on data received from server.'''
+    
+    received_data: dict[str, str | int] = message.value
+    logger.debug(f'new data received: {received_data}')
+    # Use Tensorflow model to make prediction
+    # prediction = model.predict(data)
+    # Include predicted result and original request ID in message payload
+    # response = {'request_id': message['request_id'], 'predicted_result': prediction.tolist()}
+    await _send_prediction_result(received_data['request_id'], received_data['data'])
+
+
+async def run_consumer() -> None:
+    '''Initialize Kafka and start consuming messages from server.'''
+
+    await initialize_kafka()
+    request_receiver = await get_request_receiver()
     while True:
-        message = await request_receiver.getone()
-        await perform_prediction(message, result_sender)
-    logger.info('interrupted by user, quitting consumer')
-    await stop_kafka(result_sender, request_receiver)
+        try:
+            message: ConsumerRecord = await request_receiver.getone()
+            await perform_prediction(message)
+        except ConsumerStoppedError:
+            return
+
+
+async def main():
+    await run_consumer()
 
 
 if __name__ == '__main__':
-    logger.info('Consumer started')
-    asyncio.run(main())
+    logger.info('starting consumer...')
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+        loop.run_until_complete(stop_kafka())
