@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass, field
 import json
 import logging
 import logging.config
@@ -10,12 +11,28 @@ import tensorflow as tf
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
 logging.getLogger('aiokafka').setLevel(logging.ERROR)
-logger = logging.getLogger('debug')
+logger = logging.getLogger('predictions')
 
 result_sender: AIOKafkaProducer = None
 request_receiver: AIOKafkaConsumer = None
 
 # model = tf.keras.models.load_model('my_model.h5')
+
+
+@dataclass(frozen=True)
+class PredictionResult:
+    request_id: str
+    first_genre: str = field(default='first_genre')
+    first_genre_result: float = field(default=0.6)
+    second_genre: str = field(default='second_genre')
+    second_genre_result: float = field(default=0.3)
+    third_genre: str = field(default='third_genre')
+    third_genre_result: float = field(default=0.1)
+
+
+class PredictionResultEncoder(json.JSONEncoder):
+    def default(self, prediction_result: PredictionResult):
+        return prediction_result.__dict__
 
 
 async def _create_request_receiver() -> AIOKafkaConsumer:
@@ -128,16 +145,17 @@ async def stop_kafka() -> None:
     logger.debug('kafka stopped successfully')
 
 
-async def _send_prediction_result(request_id: str, prediction_result: str) -> None:
+async def _send_prediction_result(request_id: str, prediction_result: str, prediction_result_encoder: PredictionResultEncoder) -> None:
     '''Send prediction result to server.'''
     
     response = {'request_id': request_id, 'predicted_result': prediction_result}
+    response = PredictionResult(request_id)
     result_sender = await get_result_sender()
-    await result_sender.send_and_wait('results_topic', response)
+    await result_sender.send_and_wait('results_topic', prediction_result_encoder.encode(response))
     logger.debug(f'result sent to producer: {response}')
 
 
-async def perform_prediction(message: ConsumerRecord) -> None:
+async def perform_prediction(message: ConsumerRecord, prediction_result_encoder: PredictionResultEncoder) -> None:
     '''Perform prediction on data received from server.'''
     
     received_data: dict[str, str | int] = message.value
@@ -146,7 +164,7 @@ async def perform_prediction(message: ConsumerRecord) -> None:
     # prediction = model.predict(data)
     # Include predicted result and original request ID in message payload
     # response = {'request_id': message['request_id'], 'predicted_result': prediction.tolist()}
-    await _send_prediction_result(received_data['request_id'], received_data['data'])
+    await _send_prediction_result(received_data['request_id'], received_data['data'], prediction_result_encoder)
 
 
 async def run_consumer() -> None:
@@ -154,10 +172,11 @@ async def run_consumer() -> None:
 
     await initialize_kafka()
     request_receiver = await get_request_receiver()
+    preduction_result_encoder = PredictionResultEncoder()
     while True:
         try:
             message: ConsumerRecord = await request_receiver.getone()
-            await perform_prediction(message)
+            await perform_prediction(message, preduction_result_encoder)
         except ConsumerStoppedError:
             return
 
