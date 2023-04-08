@@ -5,7 +5,6 @@ import logging.config
 from pathlib import Path
 import uuid
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.structs import ConsumerRecord
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
@@ -27,9 +26,6 @@ logger = logging.getLogger('fastapi')
 app = FastAPI(debug=True)
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
-
-request_sender: AIOKafkaProducer = None
-result_receiver: AIOKafkaConsumer = None
 
 
 async def start_server() -> None:
@@ -56,7 +52,6 @@ async def _send_request_to_consumer(message: dict[str, str | float]) -> None:
 
     request_sender = await get_request_sender()
     await request_sender.send_and_wait('requests_topic', message)
-    await request_sender.flush()  # TODO try removing
     logger.debug(f'request sent to consumer: {message}')
 
 
@@ -70,7 +65,6 @@ async def receive_result(request_id: str) -> dict[str, str | float]:
         response_id = response['request_id']
         if response_id == request_id:
             try:
-                response.pop('request_id', None)
                 return response
             except ValidationError as e:
                 return JSONResponse(content={"error": str(e)}, status_code=400)
@@ -108,7 +102,6 @@ async def post_predict(request: Request, data_input: str | int = Form(default=''
     prediction_result = await receive_result(uq_request_id)
     logger.debug(f'received prediction result: {prediction_result}')
     context = {'request': request, **prediction_result}
-    print('\n', context, '\n')
     return templates.TemplateResponse('results.html', context)
 
 

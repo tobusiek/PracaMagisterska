@@ -4,7 +4,11 @@ import logging
 import logging
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+
 logger = logging.getLogger('producer')
+
+_request_sender: AIOKafkaProducer = None
+_result_receiver: AIOKafkaConsumer = None
 
 
 async def _create_request_sender() -> AIOKafkaProducer:
@@ -35,28 +39,28 @@ async def _create_result_receiver() -> AIOKafkaConsumer:
 async def get_request_sender() -> AIOKafkaProducer:
     '''Get request_sender (AIOKafkaProducer), create if not instantiated.'''
     
-    global request_sender
-    if request_sender is None:
-        request_sender = await _create_request_sender()
+    global _request_sender
+    if _request_sender is None:
+        _request_sender = await _create_request_sender()
         logger.debug('request_sender created: {request_sender}')
-    return request_sender
+    return _request_sender
 
 
 async def get_result_receiver() -> AIOKafkaConsumer:
     '''Get result_receiver (AIOKafkaConsumer), create if not instantiated.'''
     
-    global result_receiver
-    if result_receiver is None:
-        result_receiver = await _create_result_receiver()
+    global _result_receiver
+    if _result_receiver is None:
+        _result_receiver = await _create_result_receiver()
         logger.debug('result_receiver created: {result_receiver}')
-    return result_receiver
+    return _result_receiver
 
 
 async def _start_request_sender() -> None:
     '''Start request_sender (AIOKafkaProducer).'''
 
     logger.debug('starting request_sender...')
-    await request_sender.start()
+    await _request_sender.start()
     logger.debug('request_sender started')
 
 
@@ -64,7 +68,7 @@ async def _start_result_receiver() -> None:
     '''Start result_receiver (AIOKafkaConsumer).'''
 
     logger.debug('starting result_receiver...')
-    await result_receiver.start()
+    await _result_receiver.start()
     logger.debug('result_receiver started')
 
 
@@ -82,9 +86,9 @@ async def _start_kafka() -> None:
 async def initialize_kafka() -> None:
     '''Create and start both request_sender (AIOKafkaProducer) and result_receiver (AIOKafkaConsumer).'''
 
-    global result_receiver, request_sender
+    global _result_receiver, _request_sender
     logger.debug('initializing kafka...')
-    request_sender, result_receiver = await asyncio.gather(
+    _request_sender, _result_receiver = await asyncio.gather(
         _create_request_sender(),
         _create_result_receiver(),
     )
@@ -96,14 +100,14 @@ async def _stop_request_sender() -> None:
     '''Stop request_sender (AIOKafkaProducer).'''
 
     logger.debug('stopping request_sender...')
-    await request_sender.stop()
+    await _request_sender.stop()
 
 
 async def _stop_result_receiver() -> None:
     '''Stop result_receiver (AIOKafkaConsumer).'''
     
     logger.debug('stopping result receiver...')
-    await result_receiver.stop()
+    await _result_receiver.stop()
 
 
 async def stop_kafka() -> None:

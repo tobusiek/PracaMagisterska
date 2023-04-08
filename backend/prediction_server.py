@@ -1,20 +1,19 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 import logging
 import logging.config
 from pathlib import Path
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer, ConsumerStoppedError
+from aiokafka import ConsumerStoppedError
 from aiokafka.structs import ConsumerRecord
 import tensorflow as tf
+
+from consumer_setup import initialize_kafka, stop_kafka, get_request_receiver, get_result_sender
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
 logging.getLogger('aiokafka').setLevel(logging.ERROR)
 logger = logging.getLogger('predictions')
-
-result_sender: AIOKafkaProducer = None
-request_receiver: AIOKafkaConsumer = None
 
 # model = tf.keras.models.load_model('my_model.h5')
 
@@ -22,12 +21,12 @@ request_receiver: AIOKafkaConsumer = None
 @dataclass(frozen=True)
 class PredictionResult:
     request_id: str
-    first_genre: str = field(default='first_genre')
-    first_genre_result: float = field(default=0.6)
-    second_genre: str = field(default='second_genre')
-    second_genre_result: float = field(default=0.3)
-    third_genre: str = field(default='third_genre')
-    third_genre_result: float = field(default=0.1)
+    first_genre: str
+    first_genre_result: float
+    second_genre: str
+    second_genre_result: float
+    third_genre: str
+    third_genre_result: float
 
 
 class PredictionResultEncoder(json.JSONEncoder):
@@ -35,121 +34,27 @@ class PredictionResultEncoder(json.JSONEncoder):
         return prediction_result.__dict__
 
 
-async def _create_request_receiver() -> AIOKafkaConsumer:
-    '''Create AIOKafkaConsumer for receiving requests from producer.'''
+def _create_prediction_result_message(
+        request_id: str,
+        first_genre: str = 'first_genre',
+        first_genre_result: float = 0.6,
+        second_genre: str = 'second_genre',
+        second_genre_result: float = 0.3,
+        third_genre: str = 'third_genre',
+        third_genre_result: float = 0.1
+    ) -> PredictionResult:
+    '''Create prediction result message.'''
 
-    logger.debug('creating request_receiver...')
-    return AIOKafkaConsumer(
-        'requests_topic',
-        bootstrap_servers=['localhost:9092'],
-        auto_offset_reset='latest',
-        enable_auto_commit=True,
-        group_id='requests-group',
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-        auto_commit_interval_ms=1000
-    )
-
-
-async def _create_result_sender() -> AIOKafkaProducer:
-    '''Create AIOKafkaProducer for sending prediction results to producer.'''
-
-    logger.debug('creating result_sender...')
-    return AIOKafkaProducer(
-        bootstrap_servers=['localhost:9092'], 
-        value_serializer=lambda x: json.dumps(x).encode('utf-8'),
-    )
-
-
-async def get_request_receiver() -> AIOKafkaConsumer:
-    '''Get request_receiver (AIOKafkaConsumer), create if not instantiated.'''
-
-    global request_receiver
-    if request_receiver is None:
-        request_receiver = _create_request_receiver()
-        logger.debug('request_receiver created')
-    return request_receiver
-
-
-async def get_result_sender() -> AIOKafkaProducer:
-    '''Get result_sender (AIOKafkaProducer), create if not instantiated.'''
-
-    global result_sender
-    if result_sender is None:
-        result_sender = _create_result_sender()
-        logger.debug('result_sender created')
-    return result_sender
-
-
-async def _start_result_sender() -> None:
-    '''Start result_sender (AIOKafkaProducer).'''
-
-    logger.debug('starting result_sender...')
-    await result_sender.start()
-    logger.debug('result_sender started')
-
-
-async def _start_request_receiver() -> None:
-    '''Start request_receiver (AIOKafkaConsumer).'''
-    
-    logger.debug('starting request_receiver...')
-    await request_receiver.start()
-    logger.debug('request_receiver started')
-    
-
-async def _start_kafka() -> None:
-    '''Start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
-    
-    logger.debug('starting kafka...')
-    await asyncio.gather(
-        _start_result_sender(),
-        _start_request_receiver(),
-    )
-    logger.debug('kafka started')
-
-
-async def initialize_kafka() -> None:
-    '''Create and start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
-    
-    global result_sender, request_receiver
-    logger.debug('initializing kafka...')
-    result_sender, request_receiver = await asyncio.gather(
-        _create_result_sender(),
-        _create_request_receiver(),
-    )
-    logger.debug('request_receiver and result_sender created')
-    await _start_kafka()
-
-
-async def _stop_result_sender() -> None:
-    '''Stop result_sender (AIOKafkaProducer).'''
-
-    logger.debug('stopping result_sender...')
-    await result_sender.stop()
-
-
-async def _stop_request_receiver() -> None:
-    '''Stop request_receiver (AIOKafkaConsumer).'''
-    
-    logger.debug('stopping request_receiver...')
-    await request_receiver.stop()
-
-
-async def stop_kafka() -> None:
-    '''Stop both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
-    
-    logger.debug('stopping kafka...')
-    await asyncio.gather(
-        _stop_result_sender(),
-        _stop_request_receiver(),
-    )
-    logger.debug('kafka stopped successfully')
+    return PredictionResult(request_id,
+        first_genre, first_genre_result,
+        second_genre, second_genre_result,
+        third_genre, third_genre_result)
 
 
 async def _send_prediction_result(request_id: str, prediction_result: str, prediction_result_encoder: PredictionResultEncoder) -> None:
     '''Send prediction result to server.'''
     
-    response = {'request_id': request_id, 'predicted_result': prediction_result}
-    response = PredictionResult(request_id)
+    response = _create_prediction_result_message(request_id)
     result_sender = await get_result_sender()
     await result_sender.send_and_wait('results_topic', prediction_result_encoder.encode(response))
     logger.debug(f'result sent to producer: {response}')
@@ -160,10 +65,6 @@ async def perform_prediction(message: ConsumerRecord, prediction_result_encoder:
     
     received_data: dict[str, str | int] = message.value
     logger.debug(f'new data received: {received_data}')
-    # Use Tensorflow model to make prediction
-    # prediction = model.predict(data)
-    # Include predicted result and original request ID in message payload
-    # response = {'request_id': message['request_id'], 'predicted_result': prediction.tolist()}
     await _send_prediction_result(received_data['request_id'], received_data['data'], prediction_result_encoder)
 
 
