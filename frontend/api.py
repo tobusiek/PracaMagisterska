@@ -1,6 +1,4 @@
 import asyncio
-import json
-import logging
 import logging.config
 from pathlib import Path
 import uuid
@@ -32,7 +30,7 @@ async def start_server() -> None:
     '''Start FastAPI server.'''
 
     loop = asyncio.get_event_loop()
-    config = Config(app, loop=loop, log_level='debug', reload=True)
+    config = Config(app, loop=loop, log_level='debug')
     server = Server(config)
     logger.debug('starting server...')
     await server.serve()
@@ -61,7 +59,8 @@ async def receive_result(request_id: str) -> dict[str, str | float]:
     result_receiver = await get_result_receiver()
     message: ConsumerRecord
     async for message in result_receiver:
-        response: dict[str, str] = json.loads(message.value)
+        print('\n', type(message.value), message.value, '\n')
+        response: dict[str, str] = message.value
         response_id = response['request_id']
         if response_id == request_id:
             try:
