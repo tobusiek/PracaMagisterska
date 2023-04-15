@@ -1,11 +1,12 @@
 import asyncio
+import base64
 from collections.abc import Generator
 from dataclasses import dataclass
-from enum import IntEnum
 import logging.config
 import math
 import os
 from pathlib import Path
+from sys import getsizeof
 from typing import BinaryIO
 import uuid
 
@@ -20,7 +21,7 @@ from pydantic import ValidationError
 from starlette.templating import _TemplateResponse
 from uvicorn import Config, Server
 
-from producer_setup import initialize_kafka, stop_kafka, get_request_sender, get_result_receiver
+from producer_setup import CHUNK_SIZE, MessageKey, initialize_kafka, stop_kafka, get_request_sender, get_result_receiver
 
 LOGGER_PATH = Path('resources', 'logging.ini')
 logging.config.fileConfig(LOGGER_PATH, disable_existing_loggers=False)
@@ -30,15 +31,6 @@ logger = logging.getLogger('fastapi')
 app = FastAPI(debug=True)
 app.mount('/static', StaticFiles(directory='static'), name='static')
 templates = Jinja2Templates(directory='templates')
-
-CHUNK_SIZE = 1024 * 1024
-
-
-class MessageKeys(IntEnum):
-    REQUEST_ID = 0
-    CHUNK_NUMBER = 1
-    CHUNK_DATA = 2
-    NUM_CHUNKS = 3
 
 
 @dataclass
@@ -127,13 +119,19 @@ async def post_predict(request: Request, data_input: str | int = Form(default=''
     return templates.TemplateResponse('results.html', context)
 
 
-def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> dict[MessageKeys, int | bytes]:
-    return {
-            MessageKeys.REQUEST_ID: request_id,
-            MessageKeys.CHUNK_NUMBER: file_chunk.chunk_number,
-            MessageKeys.CHUNK_DATA: file_chunk.chunk_data,
-            MessageKeys.NUM_CHUNKS: file_chunk.num_of_chunks
+def _encode_file_chunk_with_base64(file_chunk: bytes):
+    return base64.b64encode(file_chunk).decode('utf-8')
+
+
+def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> dict[MessageKey, int | bytes]:
+    message = {
+            MessageKey.REQUEST_ID.value: request_id,
+            MessageKey.CHUNK_NUMBER.value: file_chunk.chunk_number,
+            MessageKey.NUM_CHUNKS.value: file_chunk.num_of_chunks,
+            MessageKey.CHUNK_DATA.value: _encode_file_chunk_with_base64(file_chunk.chunk_data),
         }
+    logger.debug(f'created new message with file chunk: {message}')
+    return message
 
 
 async def _chunkify_file(file: BinaryIO) -> Generator[FileChunk]:

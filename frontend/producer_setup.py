@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 import asyncio
 import logging
@@ -9,6 +10,15 @@ logger = logging.getLogger('producer')
 _request_sender: AIOKafkaProducer = None
 _result_receiver: AIOKafkaConsumer = None
 
+CHUNK_SIZE = 1024 * 1024
+
+
+class MessageKey(Enum):
+    REQUEST_ID = 'request_id'
+    CHUNK_NUMBER = 'chunk_number'
+    NUM_CHUNKS = 'num_chunks'
+    CHUNK_DATA = 'chunk_data'
+
 
 async def _create_request_sender() -> AIOKafkaProducer:
     '''Create AIOKafkaProducer for sending requests to consumer.'''
@@ -16,7 +26,8 @@ async def _create_request_sender() -> AIOKafkaProducer:
     logger.debug('creating request_sender...')
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
-        value_serializer=lambda x: json.dumps(x).encode('utf-8'),
+        value_serializer=lambda message: json.dumps(message).encode('utf-8'),
+        max_request_size=2 * CHUNK_SIZE
     )
 
 
@@ -30,7 +41,7 @@ async def _create_result_receiver() -> AIOKafkaConsumer:
         auto_offset_reset='latest',
         enable_auto_commit=True,
         group_id='results-group',
-        value_deserializer=lambda x: json.loads(x.decode()),
+        value_deserializer=lambda message: json.loads(message.decode('utf-8')),
         auto_commit_interval_ms=1000
     )
 

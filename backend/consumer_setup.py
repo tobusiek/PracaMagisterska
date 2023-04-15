@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 import json
 import logging
 
@@ -20,7 +21,7 @@ async def _create_request_receiver() -> AIOKafkaConsumer:
         auto_offset_reset='latest',
         enable_auto_commit=True,
         group_id='requests-group',
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+        value_deserializer=lambda message: json.loads(message.decode('utf-8')),
         auto_commit_interval_ms=1000
     )
 
@@ -31,7 +32,7 @@ async def _create_result_sender() -> AIOKafkaProducer:
     logger.debug('creating result_sender...')
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
-        value_serializer=lambda x: json.dumps(x).encode('utf-8'),
+        value_serializer=lambda message: json.dumps(message).encode('utf-8'),
     )
 
 

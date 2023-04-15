@@ -1,5 +1,4 @@
 import asyncio
-from enum import IntEnum
 import logging.config
 from pathlib import Path
 
@@ -8,7 +7,7 @@ from aiokafka.structs import ConsumerRecord
 import tensorflow as tf
 
 from consumer_setup import initialize_kafka, stop_kafka, get_request_receiver, get_result_sender
-from backend.models import PredictionResultModel, FileChunkRequest
+from models import PredictionResultModel, FileChunkRequest
 
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
@@ -18,13 +17,6 @@ logger = logging.getLogger('predictions')
 # model = tf.keras.models.load_model('my_model.h5')
 
 REQUESTS_BUFFER: dict[str, bytes | int | str] = {}
-
-
-class MessageKeys(IntEnum):
-    REQUEST_ID = 0
-    CHUNK_NUMBER = 1
-    CHUNK_DATA = 2
-    NUM_CHUNKS = 3
 
 
 def _create_prediction_result_message(
