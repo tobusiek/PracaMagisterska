@@ -9,6 +9,7 @@ from pathlib import Path
 from sys import getsizeof
 from typing import BinaryIO
 import uuid
+import pickle
 
 from aiokafka.structs import ConsumerRecord
 from fastapi import FastAPI, Request, UploadFile, File
@@ -38,6 +39,7 @@ class FileChunk:
     chunk_number: int
     num_of_chunks: int
     chunk_data: bytes
+    file_extension: str
 
 
 async def start_server() -> None:
@@ -127,20 +129,27 @@ def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> d
     message = {
             MessageKey.REQUEST_ID.value: request_id,
             MessageKey.CHUNK_NUMBER.value: file_chunk.chunk_number,
-            MessageKey.NUM_CHUNKS.value: file_chunk.num_of_chunks,
+            MessageKey.NUM_OF_CHUNKS.value: file_chunk.num_of_chunks,
             MessageKey.CHUNK_DATA.value: _encode_file_chunk_with_base64(file_chunk.chunk_data),
+            MessageKey.FILE_EXTENSION.value: file_chunk.file_extension,
         }
-    logger.debug(f'created new message with file chunk: {message}')
+    logger.debug(f'created new message with file chunk: {request_id=} {file_chunk.chunk_number=} {file_chunk.num_of_chunks=}')
     return message
 
 
-async def _chunkify_file(file: BinaryIO) -> Generator[FileChunk]:
+def _get_file_extension(filename: str) -> str:
+    return Path(filename).suffix
+
+
+async def _chunkify_file(file: BinaryIO, file_extension: str) -> Generator[FileChunk]:
     file_size = os.fstat(file.fileno()).st_size
     num_of_chunks = math.ceil(file_size / CHUNK_SIZE)
     file.seek(0)
     for chunk_number in range(num_of_chunks):
         chunk_data = file.read(CHUNK_SIZE)
-        yield FileChunk(chunk_number, num_of_chunks, chunk_data)
+        if not chunk_data:
+            break
+        yield FileChunk(chunk_number, num_of_chunks, chunk_data, file_extension)
 
 
 @app.get('/predict_file', response_class=HTMLResponse)
@@ -154,7 +163,8 @@ async def post_predict_file(request: Request, file: UploadFile = File(...)):
     request_id = str(uuid.uuid4())
     file_object = file.file
     request_sender = await get_request_sender()
-    async for file_chunk in _chunkify_file(file_object):
+    file_extension = _get_file_extension(file.filename)
+    async for file_chunk in _chunkify_file(file_object, file_extension):
         message = _create_message_with_file_chunk(request_id, file_chunk)
         await request_sender.send_and_wait('requests_topic', message)
     return {'file': file.filename}

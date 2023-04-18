@@ -18,7 +18,8 @@ class PredictionResultModel:
 
 @dataclass(frozen=True)
 class FileChunkRequest:
-    id: str
+    request_id: str
     chunk_number: int
     num_of_chunks: int
     chunk_data: bytes
+    file_extension: str

@@ -16,8 +16,9 @@ CHUNK_SIZE = 1024 * 1024
 class MessageKey(Enum):
     REQUEST_ID = 'request_id'
     CHUNK_NUMBER = 'chunk_number'
-    NUM_CHUNKS = 'num_chunks'
+    NUM_OF_CHUNKS = 'num_of_chunks'
     CHUNK_DATA = 'chunk_data'
+    FILE_EXTENSION = 'file_extension'
 
 
 async def _create_request_sender() -> AIOKafkaProducer:

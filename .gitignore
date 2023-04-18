@@ -135,3 +135,5 @@ model/Data/
 test_audio.mp3
 test_audio.wav
 .vscode
+backend/model/temp_files
+backend/model/Data
