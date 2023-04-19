@@ -18,7 +18,7 @@ logger = logging.getLogger('fastapi')
 
 @dataclass
 class FileChunk:
-    '''Class for storing chunks of audio files.'''
+    '''Dataclass for storing chunks of audio files.'''
 
     chunk_number: int
     num_of_chunks: int

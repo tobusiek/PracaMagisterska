@@ -14,6 +14,8 @@ from tools.const_variables import DATASET_INFO
 
 
 class AudioPreprocessor:
+    '''Class for audio preprocessing.'''
+
     _temp_file_creator = TempFileCreator()
     _dataset_features: dict[str, dict[str, float]] = DATASET_INFO['features']
     _dataset_column_names: list[str] = list(_dataset_features.keys())
@@ -25,6 +27,8 @@ class AudioPreprocessor:
         ]
 
     def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> pd.DataFrame:
+        '''Create temporary file from bytes, load it with librosa, trim it, make a dataframe, minmax features and delete temporary file.'''
+
         temp_file = self._temp_file_creator.create_temp_file(request_id, file_data, file_extension)
         audio, sr = librosa.load(temp_file)
         audio = self._trim_audio(audio)
@@ -37,13 +41,30 @@ class AudioPreprocessor:
     
     @staticmethod
     def _trim_audio(audio: np.ndarray) -> np.ndarray:
+        '''Trim audio to get rid of silent parts.'''
+
         return trim(audio)[0]
     
     @staticmethod
     def _get_mean_and_var(feature: np.ndarray) -> tuple[float, float]:
+        '''Get mean and var from feature.'''
+
         return np.mean(feature), np.var(feature)
     
-    def _get_features_for_row(self, split: np.ndarray) -> np.ndarray:
+    def _split_audio(self, audio: np.ndarray) -> list[np.ndarray]:
+        '''Split the audio to fit length of dataset records.'''
+
+        n_splits = len(audio) // self._length_of_dataset_records
+        return np.array_split(audio, n_splits)
+    
+    def _trim_split(self, split: np.ndarray) -> np.ndarray:
+        '''Trim the split to fit length of dataset records.'''
+
+        return split[:self._length_of_dataset_records]
+    
+    def _get_features_for_split(self, split: np.ndarray) -> np.ndarray:
+        '''Get features for split that were used in dataset.'''
+
         features_for_row = []
         for feature in self._features_without_mfcc_and_tempo:
             feature_mean, feature_var = self._get_mean_and_var(feature(y=split))
@@ -56,25 +77,24 @@ class AudioPreprocessor:
             features_for_row.append(mfcc_var)
         return features_for_row
     
-    def _split_audio(self, audio: np.ndarray) -> list[np.ndarray]:
-        n_splits = len(audio) // self._length_of_dataset_records
-        return np.array_split(audio, n_splits)
-    
-    def _trim_split(self, split: np.ndarray) -> np.ndarray:
-        return split[:self._length_of_dataset_records]
-    
     def _create_audio_matrix(self, audio: np.ndarray) -> list[np.ndarray]:
+        '''Create matrix for audio, splitting it to fit length of dataset records.'''
+
         audio_matrix: list[np.ndarray] = []
         audio_splits = self._split_audio(audio)
         for split in audio_splits:
             trimmed_split = self._trim_split(split)
-            audio_matrix.append(self._get_features_for_row(trimmed_split))
+            audio_matrix.append(self._get_features_for_split(trimmed_split))
         return audio_matrix
     
     def _create_dataframe(self, audio_matrix: list[np.ndarray]) -> pd.DataFrame:
+        '''Create dataframe for audio from matrix.'''
+
         return pd.DataFrame(audio_matrix, columns=self._dataset_column_names)
 
     def _minmax_column(self, column: pd.Series, column_id: str) -> pd.DataFrame:
+        '''Minmax column of audio dataframe.'''
+
         column_info = self._dataset_features[column_id]
         column_min = column_info['min']
         column_max = column_info['max'] 
@@ -82,12 +102,16 @@ class AudioPreprocessor:
         return minmaxed_column
     
     def _minmax_audio_df(self, audio_df: pd.DataFrame) -> pd.DataFrame:
+        '''Minmax columns in audio dataframe.'''
+
         for column in audio_df.columns:
             audio_df[column] = self._minmax_column(audio_df[column], column)
         return audio_df
     
     @staticmethod
     def _convert_audio_df_to_float32(audio_df: pd.DataFrame) -> pd.DataFrame:
+        '''Convert features in dataframe to float32.'''
+
         for column in audio_df.columns:
             audio_df[column] = audio_df[column].astype(np.float32)
         return audio_df

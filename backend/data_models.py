@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PredictionResultModel:
+    '''Dataclass for model's prediction result.'''
+
     request_id: str
     first_genre: str
     first_genre_result: float
@@ -18,6 +20,8 @@ class PredictionResultModel:
 
 @dataclass(frozen=True)
 class FileChunkRequest:
+    '''Dataclass for request with file chunk.'''
+    
     request_id: str
     chunk_number: int
     num_of_chunks: int
