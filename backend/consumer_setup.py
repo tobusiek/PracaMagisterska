@@ -9,8 +9,6 @@ logger = logging.getLogger('consumer')
 _request_receiver: AIOKafkaConsumer = None
 _result_sender: AIOKafkaProducer = None
 
-CHUNK_SIZE = 1024 * 1024
-
 
 async def _create_request_receiver() -> AIOKafkaConsumer:
     '''Create AIOKafkaConsumer for receiving requests from producer.'''
@@ -36,7 +34,6 @@ async def _create_result_sender() -> AIOKafkaProducer:
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
         value_serializer=lambda message: json.dumps(message).encode('utf-8'),
-        max_request_size=2 * CHUNK_SIZE
     )
 
 
