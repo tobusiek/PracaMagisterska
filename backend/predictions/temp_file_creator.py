@@ -26,8 +26,8 @@ class TempFileCreator:
         temp_file_path = Path(self._files_temp_path / temp_file_name)
         with open(temp_file_path, 'wb+') as temp_file:
             temp_file.write(file_data)
-        # if file_extension != '.wav':
-            # temp_file_path = self._create_temp_wav_file(request_id, temp_file_name)
+        if file_extension != '.wav':
+            temp_file_path = self._create_temp_wav_file(request_id, temp_file_name)
         return temp_file_path
     
     def delete_temp_file(self, request_id: str) -> None:

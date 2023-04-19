@@ -1,5 +1,4 @@
 import asyncio
-from enum import Enum
 import json
 import logging
 
@@ -9,6 +8,8 @@ logger = logging.getLogger('consumer')
 
 _request_receiver: AIOKafkaConsumer = None
 _result_sender: AIOKafkaProducer = None
+
+CHUNK_SIZE = 1024 * 1024
 
 
 async def _create_request_receiver() -> AIOKafkaConsumer:
@@ -22,7 +23,9 @@ async def _create_request_receiver() -> AIOKafkaConsumer:
         enable_auto_commit=True,
         group_id='requests-group',
         value_deserializer=lambda message: json.loads(message.decode('utf-8')),
-        auto_commit_interval_ms=1000
+        auto_commit_interval_ms=1_000,
+        heartbeat_interval_ms=30_000,
+        session_timeout_ms=30_000,
     )
 
 
@@ -33,6 +36,7 @@ async def _create_result_sender() -> AIOKafkaProducer:
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
         value_serializer=lambda message: json.dumps(message).encode('utf-8'),
+        max_request_size=2 * CHUNK_SIZE
     )
 
 

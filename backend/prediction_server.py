@@ -30,7 +30,7 @@ async def _send_prediction_result(prediction_result: PredictionResultModel) -> N
     
     response = _create_prediction_result_message(prediction_result)
     result_sender = await get_result_sender()
-    await result_sender.send_and_wait('results_topic', response.make_dict())
+    await result_sender.send_and_wait('results_topic', response)
     logger.debug(f'result sent to producer: {response}')
 
 
@@ -43,7 +43,7 @@ async def perform_prediction(message: ConsumerRecord) -> None:
 
 
 def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
-    return base64.b64encode(file_chunk.encode('utf-8'))
+    return base64.b64decode(file_chunk.encode('utf-8'))
 
 
 async def _create_file_from_chunks(request_id: str) -> bytes | None:
@@ -60,14 +60,16 @@ async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: 
     await _send_prediction_result(prediction_result)
 
 
-
 async def process_messages(message: ConsumerRecord, model: PredictionModel) -> None:
     message_content = message.value
     file_chunk_request = FileChunkRequest(**message_content)
     request_id = file_chunk_request.request_id
+    num_of_chunks = file_chunk_request.num_of_chunks
     if request_id not in REQUESTS_BUFFER:
-        REQUESTS_BUFFER[request_id] = [None] * file_chunk_request.num_of_chunks
-    REQUESTS_BUFFER[request_id][file_chunk_request.chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
+        REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
+    chunk_number = file_chunk_request.chunk_number
+    REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
+    logger.debug(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
     file_data = await _create_file_from_chunks(request_id)
     if file_data:
         await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)

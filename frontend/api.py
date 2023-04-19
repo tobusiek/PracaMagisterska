@@ -6,10 +6,8 @@ import logging.config
 import math
 import os
 from pathlib import Path
-from sys import getsizeof
 from typing import BinaryIO
 import uuid
-import pickle
 
 from aiokafka.structs import ConsumerRecord
 from fastapi import FastAPI, Request, UploadFile, File
@@ -69,20 +67,32 @@ async def _send_request_to_consumer(message: dict[str, str | float]) -> None:
     logger.debug(f'request sent to consumer: {message}')
 
 
-async def receive_result(request_id: str) -> dict[str, str | float]:
+async def _receive_result(request_id: str) -> dict[str, str | float]:
     '''Receive message with prediction result from consumer. Returns prediction result for specific request.'''
 
     result_receiver = await get_result_receiver()
     message: ConsumerRecord
     async for message in result_receiver:
-        print('\n', type(message.value), message.value, '\n')
         response: dict[str, str] = message.value
         response_id = response['request_id']
         if response_id == request_id:
             try:
                 return response
             except ValidationError as e:
-                return JSONResponse(content={"error": str(e)}, status_code=400)
+                return JSONResponse(content={'error': str(e)}, status_code=400)
+
+
+async def _receive_prediction_result(request_id: str):
+    result_receiver = await get_result_receiver()
+    message: ConsumerRecord
+    async for message in result_receiver:
+        response: dict[str, str | float] = message.value
+        response_id = response['request_id']
+        if response_id == request_id:
+            try:
+                return response
+            except ValidationError as e:
+                return JSONResponse(content={'error': str(e)}, status_code=400)
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -115,7 +125,7 @@ async def post_predict(request: Request, data_input: str | int = Form(default=''
     uq_request_id = str(uuid.uuid4())
     message = _create_message(uq_request_id, data_input)
     await _send_request_to_consumer(message)
-    prediction_result = await receive_result(uq_request_id)
+    prediction_result = await _receive_result(uq_request_id)
     logger.debug(f'received prediction result: {prediction_result}')
     context = {'request': request, **prediction_result}
     return templates.TemplateResponse('results.html', context)
@@ -133,7 +143,7 @@ def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> d
             MessageKey.CHUNK_DATA.value: _encode_file_chunk_with_base64(file_chunk.chunk_data),
             MessageKey.FILE_EXTENSION.value: file_chunk.file_extension,
         }
-    logger.debug(f'created new message with file chunk: {request_id=} {file_chunk.chunk_number=} {file_chunk.num_of_chunks=}')
+    logger.debug(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number} out of {file_chunk.num_of_chunks}')
     return message
 
 
@@ -158,7 +168,7 @@ async def get_predict_file(request: Request) -> _TemplateResponse:
 
 
 @app.post('/predict_file')
-async def post_predict_file(request: Request, file: UploadFile = File(...)):
+async def post_predict_file(request: Request, file: UploadFile = File(...)) -> _TemplateResponse:
     logger.debug(f'received file: {file.filename}')
     request_id = str(uuid.uuid4())
     file_object = file.file
@@ -167,7 +177,10 @@ async def post_predict_file(request: Request, file: UploadFile = File(...)):
     async for file_chunk in _chunkify_file(file_object, file_extension):
         message = _create_message_with_file_chunk(request_id, file_chunk)
         await request_sender.send_and_wait('requests_topic', message)
-    return {'file': file.filename}
+    results = await _receive_prediction_result(request_id)
+    logger.debug(f'received results: {results}')
+    context = {'request': request, **results}
+    return templates.TemplateResponse('results.html', context)
 
 
 async def main() -> None:

@@ -28,7 +28,7 @@ async def _create_request_sender() -> AIOKafkaProducer:
     return AIOKafkaProducer(
         bootstrap_servers=['localhost:9092'], 
         value_serializer=lambda message: json.dumps(message).encode('utf-8'),
-        max_request_size=2 * CHUNK_SIZE
+        max_request_size=2 * CHUNK_SIZE,
     )
 
 
@@ -43,7 +43,7 @@ async def _create_result_receiver() -> AIOKafkaConsumer:
         enable_auto_commit=True,
         group_id='results-group',
         value_deserializer=lambda message: json.loads(message.decode('utf-8')),
-        auto_commit_interval_ms=1000
+        auto_commit_interval_ms=1_000
     )
 
 

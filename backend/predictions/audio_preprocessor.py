@@ -15,7 +15,8 @@ from tools.const_variables import DATASET_INFO
 
 class AudioPreprocessor:
     _temp_file_creator = TempFileCreator()
-    _dataset_column_names: list[str] = DATASET_INFO['features']
+    _dataset_features: dict[str, dict[str, float]] = DATASET_INFO['features']
+    _dataset_column_names: list[str] = list(_dataset_features.keys())
     _length_of_dataset_records = DATASET_INFO['length_of_records']
     
     _features_without_mfcc_and_tempo: list[Callable[[np.ndarray], float]] = [
@@ -74,17 +75,18 @@ class AudioPreprocessor:
         return pd.DataFrame(audio_matrix, columns=self._dataset_column_names)
 
     def _minmax_column(self, column: pd.Series, column_id: str) -> pd.DataFrame:
-        column_info = self._dataset_info[column_id]
+        column_info = self._dataset_features[column_id]
         column_min = column_info['min']
         column_max = column_info['max'] 
         minmaxed_column = (column - column_min) / (column_max - column_min)
         return minmaxed_column
     
     def _minmax_audio_df(self, audio_df: pd.DataFrame) -> pd.DataFrame:
-        for column_id, column in enumerate(audio_df.columns):
-            audio_df[column] = self._minmax_column(column, column_id)
+        for column in audio_df.columns:
+            audio_df[column] = self._minmax_column(audio_df[column], column)
         return audio_df
     
+    @staticmethod
     def _convert_audio_df_to_float32(audio_df: pd.DataFrame) -> pd.DataFrame:
         for column in audio_df.columns:
             audio_df[column] = audio_df[column].astype(np.float32)
