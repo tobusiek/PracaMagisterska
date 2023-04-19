@@ -1,8 +1,11 @@
+import logging
 from pathlib import Path
 
 from pydub import AudioSegment
 
 from tools.const_variables import MODEL_DIR
+
+logger = logging.getLogger('file_creator')
 
 
 class TempFileCreator:
@@ -16,6 +19,7 @@ class TempFileCreator:
         if self._files_temp_path.exists():
             return
         self._files_temp_path.mkdir()
+        logger.debug('created directory for temporary files')
 
     def _create_temp_wav_file(self, request_id: str, temp_filename: str) -> Path:
         '''Create temporary .wav file from other extensions.'''
@@ -24,6 +28,7 @@ class TempFileCreator:
         audio_wav_path = self._files_temp_path / temp_filename_wav
         audio_segment = AudioSegment.from_file(self._files_temp_path / temp_filename)
         audio_segment.export(audio_wav_path, format='wav')
+        logger.debug(f'created temporary .wav file for {request_id=}')
         return audio_wav_path
 
     def create_temp_file(self, request_id: str, file_data: bytes, file_extension: str) -> Path:
@@ -34,6 +39,7 @@ class TempFileCreator:
         temp_file_path = Path(self._files_temp_path / temp_file_name)
         with open(temp_file_path, 'wb+') as temp_file:
             temp_file.write(file_data)
+        logger.debug(f'created temporary {file_extension} file for {request_id=}')
         if file_extension != '.wav':
             temp_file_path = self._create_temp_wav_file(request_id, temp_file_name)
         return temp_file_path
@@ -46,3 +52,4 @@ class TempFileCreator:
                 continue
             if request_id in dir_el.name:
                 dir_el.unlink()
+        logger.debug(f'deleted temporary audio file(s) for {request_id=}')

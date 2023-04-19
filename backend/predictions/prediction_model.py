@@ -1,4 +1,5 @@
 from heapq import nlargest
+import logging
 
 import numpy as np
 import tensorflow as tf
@@ -6,6 +7,8 @@ import tensorflow as tf
 from data_models import PredictionResultModel
 from .audio_preprocessor import AudioPreprocessor
 from tools.const_variables import MODEL_DIR, DATASET_INFO
+
+logger = logging.getLogger('predictions')
 
 
 class PredictionModel:
@@ -24,6 +27,7 @@ class PredictionModel:
         predicted_genres_means = [np.mean(prediction_for_genre) for prediction_for_genre in prediction.T]
         largest_means_of_predicted_genres = nlargest(self._genres_to_take, predicted_genres_means)
         indices_of_n_largest_means = [np.where(predicted_genres_means == nth_max)[0][0] for nth_max in largest_means_of_predicted_genres]
+        logger.debug(f'largest means: {largest_means_of_predicted_genres}, indices for genres with largest means: {indices_of_n_largest_means}')
         return [(self._labels_decoded[idx], round(100 * nth_largest_mean, 2))
                 for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres)]
 
@@ -34,7 +38,7 @@ class PredictionModel:
         prediction_with_first_largest_mean = n_predictions_with_largest_means[0]
         prediction_with_second_largest_mean = n_predictions_with_largest_means[1]
         prediction_with_third_largest_mean = n_predictions_with_largest_means[2]
-        return PredictionResultModel(
+        prediction_result = PredictionResultModel(
             request_id=request_id,
             first_genre=prediction_with_first_largest_mean[0],
             first_genre_result=prediction_with_first_largest_mean[1],
@@ -42,11 +46,14 @@ class PredictionModel:
             second_genre_result=prediction_with_second_largest_mean[1],
             third_genre=prediction_with_third_largest_mean[0],
             third_genre_result=prediction_with_third_largest_mean[1])
+        logger.debug(f'prediction result for {request_id=}: {prediction_result}')
+        return prediction_result
 
 
     def predict(self, request_id: str, file_data: bytes, file_extension: str) -> PredictionResultModel:
         '''Make a prediction on audio file.'''
 
+        logger.debug(f'making prediction for {request_id=}...')
         audio_df = self._audio_preprocessor.preprocess_audio(request_id, file_data, file_extension)
         prediction = self._model.predict(audio_df)
         return self._create_prediction_result_model(request_id, prediction)

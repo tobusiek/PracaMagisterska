@@ -1,3 +1,4 @@
+import logging
 from typing import Callable
 
 import librosa
@@ -11,6 +12,8 @@ import pandas as pd
 
 from .temp_file_creator import TempFileCreator
 from tools.const_variables import DATASET_INFO
+
+logger = logging.getLogger('preprocessor')
 
 
 class AudioPreprocessor:
@@ -29,6 +32,7 @@ class AudioPreprocessor:
     def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> pd.DataFrame:
         '''Create temporary file from bytes, load it with librosa, trim it, make a dataframe, minmax features and delete temporary file.'''
 
+        logger.debug(f'preprocessing audio for {request_id=}...')
         temp_file = self._temp_file_creator.create_temp_file(request_id, file_data, file_extension)
         audio, sr = librosa.load(temp_file)
         audio = self._trim_audio(audio)
@@ -55,6 +59,7 @@ class AudioPreprocessor:
         '''Split the audio to fit length of dataset records.'''
 
         n_splits = len(audio) // self._length_of_dataset_records
+        logger.debug(f'audio splitted to {n_splits} splits')
         return np.array_split(audio, n_splits)
     
     def _trim_split(self, split: np.ndarray) -> np.ndarray:
@@ -80,6 +85,7 @@ class AudioPreprocessor:
     def _create_audio_matrix(self, audio: np.ndarray) -> list[np.ndarray]:
         '''Create matrix for audio, splitting it to fit length of dataset records.'''
 
+        logger.debug('creating audio matrix...')
         audio_matrix: list[np.ndarray] = []
         audio_splits = self._split_audio(audio)
         for split in audio_splits:
