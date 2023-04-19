@@ -12,8 +12,7 @@ $ sudo apt-get install ffmpeg
 **Instalation**
 ```console
 $ sudo apt install python3.10
-# verify python version
-$ python3.10 --version
+$ python3.10 --version  # verify python version
 ```
 
 **Venv setup**
@@ -42,14 +41,28 @@ $ cd /opt/
 $ sudo apt install default-jdk
 $ sudo wget https://dlcdn.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz
 $ sudo tar -xvzf kafka_2.12-3.4.0.tgz
-
-$ cd kafka_2.12-3.4.0/config
-$ sudoedit server.properties
-# find advertised.listeners
-# uncomment line
-# change to advertised.listeners=PLAINTEXT://localhost:9092
-# ctrl+x -> y -> enter
 ```
+
+**Configuration**
+```console
+$ cd kafka_2.12-3.4.0/config
+$ sudo nano server.properties
+```
+
+1. Find *advertised.listeners*
+2. Uncomment line
+3. Change to *advertised.listeners=PLAINTEXT://localhost:9092*
+4. ctrl+x -> y -> enter
+
+```console
+$ sudo nano producer.properties
+```
+
+5. Find *max.request.size*
+6. Change to *max.request.size=2097152*
+7. ctrl+x -> y -> enter
+
+</br>
 
 **Start Zookeper**
 ```console
@@ -78,17 +91,12 @@ $ sudo ./kafka-commands/create-topics.sh
 
 **Start the consumer**
 ```console
-(venv)$ cd src/
-(venv)$ python3 consumer.py
+(venv)$ cd backend/
+(venv)$ python prediction_server.py
 ```
 
 **Start the producer**
 ```console
-(venv)$ uvicorn producer:app --reload 
+(venv)$ cd frontend/
+(venv)$ python api.py
 ```
-
-**Test application**
-```console
-$ python3 test_server.py
-```
-
