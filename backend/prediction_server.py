@@ -34,19 +34,15 @@ async def _send_prediction_result(prediction_result: PredictionResultModel) -> N
     logger.debug(f'result sent to producer: {response}')
 
 
-async def perform_prediction(message: ConsumerRecord) -> None:
-    '''Perform prediction on data received from server.'''
-    
-    received_data: dict[str, str | int] = message.value
-    logger.debug(f'new data received: {received_data}')
-    await _send_prediction_result(received_data['request_id'], received_data['data'])
-
-
 def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
-    return base64.b64decode(file_chunk.encode('utf-8'))
+    '''Decode file chunk received from producer (str) with base64 encoding.'''
+
+    return base64.b64decode(file_chunk.encode())
 
 
-async def _create_file_from_chunks(request_id: str) -> bytes | None:
+def _create_file_from_chunks(request_id: str) -> bytes | None:
+    '''Create file from chunks if every chunk for sent file present in requests buffer.'''
+
     request = REQUESTS_BUFFER[request_id]
     if None in request:
         return
@@ -55,12 +51,17 @@ async def _create_file_from_chunks(request_id: str) -> bytes | None:
     return file_data
 
 
-async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: PredictionModel, file_extension: str):
+async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: PredictionModel, file_extension: str) -> None:
+    '''Perform prediction on received file and send the results back to producer.'''
+    
     prediction_result = model.predict(request_id, file_data, file_extension)
     await _send_prediction_result(prediction_result)
 
 
 async def process_messages(message: ConsumerRecord, model: PredictionModel) -> None:
+    '''Process messages received from producer, by putting them in requests buffer.
+       If the whole file is received, make a prediction and send results back to producer.'''
+
     message_content = message.value
     file_chunk_request = FileChunkRequest(**message_content)
     request_id = file_chunk_request.request_id
@@ -70,7 +71,7 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
     chunk_number = file_chunk_request.chunk_number
     REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
     logger.debug(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
-    file_data = await _create_file_from_chunks(request_id)
+    file_data = _create_file_from_chunks(request_id)
     if file_data:
         await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
 
