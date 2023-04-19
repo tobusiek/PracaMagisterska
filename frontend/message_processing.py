@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from producer_setup import CHUNK_SIZE, MessageKey, get_result_receiver
 
-logger = logging.getLogger('fastapi')
+logger = logging.getLogger('message_processor')
 
 
 @dataclass
@@ -38,6 +38,7 @@ async def chunkify_file(file: BinaryIO, file_extension: str) -> Generator[FileCh
     file_size = os.fstat(file.fileno()).st_size
     num_of_chunks = math.ceil(file_size / CHUNK_SIZE)
     file.seek(0)
+    logger.debug(f'splitting audio file to {num_of_chunks} chunks')
     for chunk_number in range(num_of_chunks):
         chunk_data = file.read(CHUNK_SIZE)
         if not chunk_data:
