@@ -3,7 +3,7 @@ from heapq import nlargest
 import logging
 
 import numpy as np
-import tensorflow as tf
+from keras.models import Model, load_model
 
 from data_models import PredictionResultModel
 from .audio_preprocessor import AudioPreprocessor
@@ -18,21 +18,21 @@ class PredictionModel:
     '''Class for model to make predictions on audio file.'''
 
     _model_path = MODEL_DIR / 'simple_model.h5'
-    _model: tf.keras.models.Model = tf.keras.models.load_model(_model_path)
+    _model: Model = load_model(_model_path)
     _audio_preprocessor = AudioPreprocessor()
     _labels = DATASET_INFO['labels']
     _labels_decoded = {label_id: label for label, label_id in _labels.items()}
     _genres_to_take = 3
 
-    def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> list[GenresPrediction]:
+    def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> tuple[GenresPrediction, ...]:
         '''Get n largest means from model prediction.'''
         
         predicted_genres_means = [np.mean(prediction_for_genre) for prediction_for_genre in prediction.T]
         largest_means_of_predicted_genres = nlargest(self._genres_to_take, predicted_genres_means)
         indices_of_n_largest_means = [np.where(predicted_genres_means == nth_max)[0][0] for nth_max in largest_means_of_predicted_genres]
         logger.debug(f'largest means: {largest_means_of_predicted_genres}, indices for genres with largest means: {indices_of_n_largest_means}')
-        return [GenresPrediction(genre=self._labels_decoded[idx], genre_result=round(100 * nth_largest_mean, 2))
-                for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres)]
+        return tuple(GenresPrediction(genre=self._labels_decoded[idx], genre_result=round(100 * nth_largest_mean, 2))
+                for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres))
 
     def _create_prediction_result_model(self, request_id: str, prediction: np.ndarray[np.ndarray[np.float32]]) -> PredictionResultModel:
         '''Create a model prediction result for n largest means from model prediction.'''
