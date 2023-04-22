@@ -27,3 +27,4 @@ class FileChunkRequest:
     num_of_chunks: int
     chunk_data: bytes
     file_extension: str
+    checksum: str

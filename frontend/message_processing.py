@@ -1,11 +1,11 @@
 import base64
-from collections.abc import Generator
 from dataclasses import dataclass
+from hashlib import sha3_224
 import logging
 import math
 import os
 from pathlib import Path
-from typing import BinaryIO
+from typing import AsyncGenerator, BinaryIO
 
 from aiokafka.structs import ConsumerRecord
 from fastapi.responses import JSONResponse
@@ -32,17 +32,22 @@ def get_file_extension(filename: str) -> str:
     return Path(filename).suffix
 
 
-async def chunkify_file(file: BinaryIO, file_extension: str) -> Generator[FileChunk]:
+async def read_file(file: BinaryIO) -> bytes:
+    return file.read()
+
+
+async def chunkify_file(file_data: bytes, file_extension: str) -> AsyncGenerator[FileChunk, None]:
     '''Create chunks from audio file to assure they fit in kafka message and yield FileChunk.'''
 
-    file_size = os.fstat(file.fileno()).st_size
+    file_size = len(file_data)
     num_of_chunks = math.ceil(file_size / CHUNK_SIZE)
-    file.seek(0)
     logger.debug(f'splitting audio file to {num_of_chunks} chunks')
     for chunk_number in range(num_of_chunks):
-        chunk_data = file.read(CHUNK_SIZE)
+        chunk_data_start_idx = chunk_number * CHUNK_SIZE
+        chunk_data_stop_idx = (chunk_number + 1) * CHUNK_SIZE
+        chunk_data = file_data[chunk_data_start_idx: chunk_data_stop_idx]
         if not chunk_data:
-            break
+            return
         yield FileChunk(chunk_number, num_of_chunks, chunk_data, file_extension)
 
 
@@ -52,7 +57,13 @@ def _encode_file_chunk_with_base64(file_chunk: bytes) -> str:
     return base64.b64encode(file_chunk).decode()
 
 
-def create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> dict[MessageKey, int | bytes]:
+def checksum(file: bytes, request_id: str) -> str:
+    checksum_result = sha3_224(file).hexdigest()
+    logger.debug(f'checksum for {request_id=}: {checksum_result}')
+    return checksum_result
+
+
+def create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file_checkum: str) -> dict[str, int | bytes | str]:
     '''Create a message with the given file chunk to be send to the prediction server.'''
     
     message = {
@@ -61,6 +72,7 @@ def create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> di
             MessageKey.NUM_OF_CHUNKS.value: file_chunk.num_of_chunks,
             MessageKey.CHUNK_DATA.value: _encode_file_chunk_with_base64(file_chunk.chunk_data),
             MessageKey.FILE_EXTENSION.value: file_chunk.file_extension,
+            MessageKey.CHECKSUM.value: file_checkum
         }
     logger.info(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number} out of {file_chunk.num_of_chunks}')
     return message

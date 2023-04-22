@@ -1,5 +1,6 @@
 import asyncio
 import base64
+from hashlib import sha3_224
 import logging.config
 from pathlib import Path
 
@@ -40,7 +41,15 @@ def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
     return base64.b64decode(file_chunk.encode())
 
 
-def _create_file_from_chunks(request_id: str) -> bytes | None:
+def _checksum(file_data: bytes) -> str:
+    return sha3_224(file_data).hexdigest()
+
+
+def _compare_checksum(file_data: bytes, original_checksum: str) -> bool:
+    return original_checksum == _checksum(file_data)
+
+
+def _create_file_from_chunks(request_id: str, original_checksum: str) -> bytes | None:
     '''Create file from chunks if every chunk for sent file present in requests buffer.'''
 
     request = REQUESTS_BUFFER[request_id]
@@ -48,7 +57,10 @@ def _create_file_from_chunks(request_id: str) -> bytes | None:
         return
     file_data = b''.join(request)
     logger.debug(f'got whole file for {request_id}')
-    return file_data
+    if _compare_checksum(file_data, original_checksum):
+        logger.debug(f'checksum for {request_id=} correct')
+        return file_data
+    raise BytesWarning('checksums differ')
 
 
 async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: PredictionModel, file_extension: str) -> None:
@@ -70,10 +82,15 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
         REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
     chunk_number = file_chunk_request.chunk_number
     REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
-    logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
-    file_data = _create_file_from_chunks(request_id)
-    if file_data:
-        await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
+    file_checksum = file_chunk_request.file_checksum
+    logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}, {file_checksum}')
+    try:
+        file_data = _create_file_from_chunks(request_id, file_checksum)
+    except BytesWarning as e:
+        logger.error(f'error for{request_id=}: {e}')
+    else:
+        if file_data:
+            await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
 
 
 async def run_consumer() -> None:

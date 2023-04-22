@@ -19,6 +19,7 @@ class MessageKey(Enum):
     NUM_OF_CHUNKS = 'num_of_chunks'
     CHUNK_DATA = 'chunk_data'
     FILE_EXTENSION = 'file_extension'
+    CHECKSUM = 'checksum'
 
 
 async def _create_request_sender() -> AIOKafkaProducer:
