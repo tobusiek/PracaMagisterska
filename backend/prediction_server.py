@@ -76,6 +76,13 @@ async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: 
     await _send_prediction_result(prediction_result)
 
 
+def _fill_buffer(request_id: str, num_of_chunks: int, chunk_number, chunk_data: bytes) -> None:
+    if request_id not in REQUESTS_BUFFER:
+        REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
+    chunk_number = chunk_number
+    REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(chunk_data)
+
+
 async def process_messages(message: ConsumerRecord, model: PredictionModel) -> None:
     '''Process messages received from producer, by putting them in requests buffer.
        If the whole file is received, make a prediction and send results back to producer.'''
@@ -84,14 +91,11 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
     file_chunk_request = FileChunkRequest(**message_content)
     request_id = file_chunk_request.request_id
     num_of_chunks = file_chunk_request.num_of_chunks
-    if request_id not in REQUESTS_BUFFER:
-        REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
     chunk_number = file_chunk_request.chunk_number
-    REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
-    file_checksum = file_chunk_request.checksum
+    _fill_buffer(request_id, num_of_chunks, chunk_number, file_chunk_request.chunk_data)
     logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
     try:
-        file_data = _create_file_from_chunks(request_id, file_checksum)
+        file_data = _create_file_from_chunks(request_id, file_chunk_request.checksum)
     except BytesWarning as e:
         logger.error(f'error for{request_id=}: {e}')
     else:
