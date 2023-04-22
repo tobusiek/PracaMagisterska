@@ -29,9 +29,9 @@ async def start_server() -> None:
     loop = asyncio.get_event_loop()
     config = Config(app, loop=loop, log_level='debug')
     server = Server(config)
-    logger.debug('starting server...')
+    logger.info('starting server...')
     await server.serve()
-    logger.debug('server stopped')
+    logger.info('server stopped successfully')
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -68,7 +68,7 @@ async def post_predict(request: Request, file: UploadFile = File(...)) -> _Templ
         message = create_message_with_file_chunk(request_id, file_chunk)
         await request_sender.send_and_wait('requests_topic', message)
     results = await receive_prediction_result(request_id)
-    logger.debug(f'received results: {results}')
+    logger.info(f'received results: {results}')
     context = {'request': request, **results}
     return templates.TemplateResponse('results.html', context)
 

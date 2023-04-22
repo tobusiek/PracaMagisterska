@@ -43,7 +43,7 @@ async def get_request_receiver() -> AIOKafkaConsumer:
     global _request_receiver
     if _request_receiver is None:
         _request_receiver = _create_request_receiver()
-        logger.debug('request_receiver created')
+        logger.info('request_receiver not present, new instnce created')
     return _request_receiver
 
 
@@ -53,7 +53,7 @@ async def get_result_sender() -> AIOKafkaProducer:
     global _result_sender
     if _result_sender is None:
         _result_sender = _create_result_sender()
-        logger.debug('result_sender created')
+        logger.info('result_sender not present, new instance created')
     return _result_sender
 
 
@@ -62,7 +62,7 @@ async def _start_result_sender() -> None:
 
     logger.debug('starting result_sender...')
     await _result_sender.start()
-    logger.debug('result_sender started')
+    logger.info('result_sender started')
 
 
 async def _start_request_receiver() -> None:
@@ -70,7 +70,7 @@ async def _start_request_receiver() -> None:
     
     logger.debug('starting request_receiver...')
     await _request_receiver.start()
-    logger.debug('request_receiver started')
+    logger.info('request_receiver started')
     
 
 async def _start_kafka() -> None:
@@ -81,7 +81,7 @@ async def _start_kafka() -> None:
         _start_result_sender(),
         _start_request_receiver(),
     )
-    logger.debug('kafka started')
+    logger.info('kafka started')
 
 
 async def initialize_kafka() -> None:
@@ -119,4 +119,4 @@ async def stop_kafka() -> None:
         _stop_result_sender(),
         _stop_request_receiver(),
     )
-    logger.debug('kafka stopped successfully')
+    logger.info('kafka stopped successfully')

@@ -31,7 +31,7 @@ async def _send_prediction_result(prediction_result: PredictionResultModel) -> N
     response = _create_prediction_result_message(prediction_result)
     result_sender = await get_result_sender()
     await result_sender.send_and_wait('results_topic', response)
-    logger.debug(f'result sent to producer: {response}')
+    logger.info(f'result sent to producer: {response}')
 
 
 def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
@@ -70,7 +70,7 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
         REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
     chunk_number = file_chunk_request.chunk_number
     REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
-    logger.debug(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
+    logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
     file_data = _create_file_from_chunks(request_id)
     if file_data:
         await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)

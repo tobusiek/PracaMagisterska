@@ -1,4 +1,5 @@
 import logging
+import multiprocessing as mp
 from typing import Callable
 
 import librosa
@@ -11,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from .temp_file_creator import TempFileCreator
-from tools.const_variables import DATASET_INFO
+from tools.const_variables import DATASET_INFO, CORES_TO_USE
 
 logger = logging.getLogger('preprocessor')
 
@@ -32,7 +33,7 @@ class AudioPreprocessor:
     def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> pd.DataFrame:
         '''Create temporary file from bytes, load it with librosa, trim it, make a dataframe, minmax features and delete temporary file.'''
 
-        logger.debug(f'preprocessing audio for {request_id=}...')
+        logger.info(f'preprocessing audio for {request_id=}...')
         temp_file = self._temp_file_creator.create_temp_file(request_id, file_data, file_extension)
         audio, sr = librosa.load(temp_file)
         audio = self._trim_audio(audio)
@@ -70,13 +71,14 @@ class AudioPreprocessor:
     def _get_features_for_split(self, split: np.ndarray) -> np.ndarray:
         '''Get features for split that were used in dataset.'''
 
+        trimmed_split = self._trim_split(split)
         features_for_row = []
         for feature in self._features_without_mfcc_and_tempo:
-            feature_mean, feature_var = self._get_mean_and_var(feature(y=split))
+            feature_mean, feature_var = self._get_mean_and_var(feature(y=trimmed_split))
             features_for_row.append(feature_mean)
             features_for_row.append(feature_var)
-        features_for_row.append(tempo(y=split))
-        for mfcc_ in mfcc(y=split):
+        features_for_row.append(tempo(y=trimmed_split))
+        for mfcc_ in mfcc(y=trimmed_split):
             mfcc_mean, mfcc_var = self._get_mean_and_var(mfcc_)
             features_for_row.append(mfcc_mean)
             features_for_row.append(mfcc_var)
@@ -88,10 +90,10 @@ class AudioPreprocessor:
         logger.debug('creating audio matrix...')
         audio_matrix: list[np.ndarray] = []
         audio_splits = self._split_audio(audio)
-        for split in audio_splits:
-            trimmed_split = self._trim_split(split)
-            audio_matrix.append(self._get_features_for_split(trimmed_split))
-        return audio_matrix
+        with mp.Pool(CORES_TO_USE) as pool:
+            for split in audio_splits:
+                audio_matrix.append(pool.apply(self._get_features_for_split, args=(split,)))
+            return audio_matrix
     
     def _create_dataframe(self, audio_matrix: list[np.ndarray]) -> pd.DataFrame:
         '''Create dataframe for audio from matrix.'''

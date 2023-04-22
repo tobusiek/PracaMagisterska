@@ -1,3 +1,4 @@
+from collections import namedtuple
 from heapq import nlargest
 import logging
 
@@ -10,6 +11,8 @@ from tools.const_variables import MODEL_DIR, DATASET_INFO
 
 logger = logging.getLogger('predictions')
 
+GenresPrediction = namedtuple('GenresPrediction', ('genre', 'genre_result'))
+
 
 class PredictionModel:
     '''Class for model to make predictions on audio file.'''
@@ -21,32 +24,30 @@ class PredictionModel:
     _labels_decoded = {label_id: label for label, label_id in _labels.items()}
     _genres_to_take = 3
 
-    def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> list[tuple[str, float]]:
+    def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> list[GenresPrediction]:
         '''Get n largest means from model prediction.'''
         
         predicted_genres_means = [np.mean(prediction_for_genre) for prediction_for_genre in prediction.T]
         largest_means_of_predicted_genres = nlargest(self._genres_to_take, predicted_genres_means)
         indices_of_n_largest_means = [np.where(predicted_genres_means == nth_max)[0][0] for nth_max in largest_means_of_predicted_genres]
         logger.debug(f'largest means: {largest_means_of_predicted_genres}, indices for genres with largest means: {indices_of_n_largest_means}')
-        return [(self._labels_decoded[idx], round(100 * nth_largest_mean, 2))
+        return [GenresPrediction(genre=self._labels_decoded[idx], genre_result=round(100 * nth_largest_mean, 2))
                 for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres)]
 
     def _create_prediction_result_model(self, request_id: str, prediction: np.ndarray[np.ndarray[np.float32]]) -> PredictionResultModel:
         '''Create a model prediction result for n largest means from model prediction.'''
 
         n_predictions_with_largest_means = self._get_n_predictions_with_largest_means(prediction)
-        prediction_with_first_largest_mean = n_predictions_with_largest_means[0]
-        prediction_with_second_largest_mean = n_predictions_with_largest_means[1]
-        prediction_with_third_largest_mean = n_predictions_with_largest_means[2]
+        first_highest_result, second_highest_result, third_highest_result = n_predictions_with_largest_means
         prediction_result = PredictionResultModel(
             request_id=request_id,
-            first_genre=prediction_with_first_largest_mean[0],
-            first_genre_result=prediction_with_first_largest_mean[1],
-            second_genre=prediction_with_second_largest_mean[0],
-            second_genre_result=prediction_with_second_largest_mean[1],
-            third_genre=prediction_with_third_largest_mean[0],
-            third_genre_result=prediction_with_third_largest_mean[1])
-        logger.debug(f'prediction result for {request_id=}: {prediction_result}')
+            first_genre=first_highest_result.genre,
+            first_genre_result=first_highest_result.genre_result,
+            second_genre=second_highest_result.genre,
+            second_genre_result=second_highest_result.genre_result,
+            third_genre=third_highest_result.genre,
+            third_genre_result=third_highest_result.genre_result)
+        logger.info(f'prediction result for {request_id=}: {prediction_result}')
         return prediction_result
 
 

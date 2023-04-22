@@ -62,7 +62,7 @@ def create_message_with_file_chunk(request_id: str, file_chunk: FileChunk) -> di
             MessageKey.CHUNK_DATA.value: _encode_file_chunk_with_base64(file_chunk.chunk_data),
             MessageKey.FILE_EXTENSION.value: file_chunk.file_extension,
         }
-    logger.debug(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number} out of {file_chunk.num_of_chunks}')
+    logger.info(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number} out of {file_chunk.num_of_chunks}')
     return message
 
 
