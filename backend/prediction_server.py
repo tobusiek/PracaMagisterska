@@ -83,7 +83,7 @@ def _fill_buffer(request_id: str, num_of_chunks: int, chunk_number, chunk_data: 
     REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(chunk_data)
 
 
-def _remove_request_cache(request_id: str) -> None:
+def _remove_request_from_buffer(request_id: str) -> None:
     if request_id not in REQUESTS_BUFFER:
         return
     REQUESTS_BUFFER.pop(request_id, None)
@@ -106,7 +106,7 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
         logger.error(f'error for{request_id=}: {e}')
     else:
         if file_data:
-            _remove_request_cache(request_id)
+            _remove_request_from_buffer(request_id)
             await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
 
 
