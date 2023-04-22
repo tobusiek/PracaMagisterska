@@ -46,7 +46,9 @@ def _checksum(file_data: bytes) -> str:
 
 
 def _compare_checksum(file_data: bytes, original_checksum: str) -> bool:
-    return original_checksum == _checksum(file_data)
+    checksum_result = _checksum(file_data)
+    logger.debug(f'original checksum={original_checksum}, checksum after concatenating={checksum_result}')
+    return original_checksum == checksum_result
 
 
 def _create_file_from_chunks(request_id: str, original_checksum: str) -> bytes | None:
@@ -82,8 +84,8 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
         REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
     chunk_number = file_chunk_request.chunk_number
     REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(file_chunk_request.chunk_data)
-    file_checksum = file_chunk_request.file_checksum
-    logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}, {file_checksum}')
+    file_checksum = file_chunk_request.checksum
+    logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
     try:
         file_data = _create_file_from_chunks(request_id, file_checksum)
     except BytesWarning as e:
