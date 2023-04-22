@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from hashlib import sha3_224
 import logging
 import math
-import os
 from pathlib import Path
 from typing import AsyncGenerator, BinaryIO
 
@@ -51,14 +50,16 @@ async def chunkify_file(file_data: bytes, file_extension: str) -> AsyncGenerator
         yield FileChunk(chunk_number, num_of_chunks, chunk_data, file_extension)
 
 
-def _encode_file_chunk_with_base64(file_chunk: bytes) -> str:
+def _encode_file_chunk_with_base64(file_data_chunk: bytes) -> str:
     '''Encode file chunk with base64 encoding and return decoded string.'''
 
-    return base64.b64encode(file_chunk).decode()
+    return base64.b64encode(file_data_chunk).decode()
 
 
-def checksum(file: bytes, request_id: str) -> str:
-    checksum_result = sha3_224(file).hexdigest()
+def checksum(file_data: bytes, request_id: str) -> str:
+    '''Checksum on file_data.'''
+
+    checksum_result = sha3_224(file_data).hexdigest()
     logger.debug(f'checksum for {request_id=}: {checksum_result}')
     return checksum_result
 

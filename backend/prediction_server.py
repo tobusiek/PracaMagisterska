@@ -42,10 +42,14 @@ def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
 
 
 def _checksum(file_data: bytes) -> str:
+    '''Checksum on file_data.'''
+
     return sha3_224(file_data).hexdigest()
 
 
 def _compare_checksum(file_data: bytes, original_checksum: str) -> bool:
+    '''Compare original checksum with checksum after concatenation of message.'''
+
     checksum_result = _checksum(file_data)
     logger.debug(f'original checksum={original_checksum}, checksum after concatenating={checksum_result}')
     return original_checksum == checksum_result
