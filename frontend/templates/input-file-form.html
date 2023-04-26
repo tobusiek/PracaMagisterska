@@ -1,16 +1,18 @@
-<html>
+<!DOCTYPE html>
     <head lang="en">
-        <meta charset="utf-8" />
+        <meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"/>
         <title>Make a prediction</title>
         <link id="favicon" rel="icon" type="image/x-icon" href="static/images/favicon.svg">
         <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
     </head>
     <body>
-        <h2>Input audio file for the prediction</h1>
+        <h2>Input audio file for the prediction</h2>
         <form method="POST" enctype="multipart/form-data">
-            <label for="data_input">Upload your file</label> <br>
-            <input type="file" name="file" id="file"> <br>
-            <input type="submit" value="Submit">
+            <div name="inline" id="inline">
+                <label for="file">Upload your file:</label>
+                <input type="file" name="file" id="file"/>
+            </div>
+            <input type="submit" id="predict-btn" name="predict-btn" value="Predict genres"/>
         </form>
     </body>
 </html>

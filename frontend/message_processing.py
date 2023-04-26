@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import AsyncGenerator, BinaryIO
 
 from aiokafka.structs import ConsumerRecord
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -31,7 +32,17 @@ def get_file_extension(filename: str) -> str:
     return Path(filename).suffix
 
 
+def validate_file_content_type(request_id: str, file_content_type: str) -> None:
+    '''Validate file content type. Raise HTTP exception if file is not an audio file.'''
+
+    if file_content_type not in ('audio/mpeg', 'audio/vorbis'):
+        logger.debug(f'Invalid file_content_type: {file_content_type} for {request_id=}')
+        raise HTTPException(400, detail='Please upload audio file')
+
+
 async def read_file(file: BinaryIO) -> bytes:
+    '''Read content of uploaded file.'''
+
     return file.read()
 
 

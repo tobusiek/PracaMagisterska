@@ -16,9 +16,7 @@ class TempFileCreator:
     def _create_files_temp_path(self) -> None:
         '''Create directory for temporary files if not exists.'''
 
-        if self._files_temp_path.exists():
-            return
-        self._files_temp_path.mkdir()
+        self._files_temp_path.mkdir(exist_ok=True)
         logger.info('created directory for temporary files')
 
     def _create_temp_wav_file(self, request_id: str, temp_filename: str) -> Path:

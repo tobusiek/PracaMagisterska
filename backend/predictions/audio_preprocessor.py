@@ -87,12 +87,13 @@ class AudioPreprocessor:
     def _create_audio_matrix(self, audio: np.ndarray) -> list[np.ndarray]:
         '''Create matrix for audio, splitting it to fit length of dataset records.'''
 
-        logger.debug('creating audio matrix...')
+        logger.debug('extracting features...')
         audio_matrix: list[np.ndarray] = []
         audio_splits = self._split_audio(audio)
         with mp.Pool(CORES_TO_USE) as pool:
             for split in audio_splits:
                 audio_matrix.append(pool.apply(self._get_features_for_split, args=(split,)))
+            logger.debug('audio matrix created')
             return audio_matrix
     
     def _create_dataframe(self, audio_matrix: list[np.ndarray]) -> pd.DataFrame:

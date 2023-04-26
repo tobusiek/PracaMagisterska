@@ -22,6 +22,12 @@ $ python3.10 -m pip install virtualenv
 $ python3.10 -m venv <your_venv_name>
 ```
 
+*If it doesn't work try:*
+```console
+$ sudo apt install python3-pip
+$ sudo apt install python3-venv
+```
+
 **Activate your venv**
 ```console
 $ source <your_venv_name>/bin/activate
@@ -39,7 +45,7 @@ $ pip install -r requirements.txt
 ```console
 $ cd /opt/
 $ sudo apt install default-jdk
-$ sudo wget https://dlcdn.apache.org/kafka/3.4.0/kafka_2.13-3.4.0.tgz
+$ sudo wget https://dlcdn.apache.org/kafka/3.4.0/kafka_2.12-3.4.0.tgz
 $ sudo tar -xvzf kafka_2.12-3.4.0.tgz
 ```
 
@@ -59,30 +65,37 @@ $ sudo nano producer.properties
 ```
 
 5. Find *max.request.size*
-6. Change to *max.request.size=2097152*
-7. ctrl+x -> y -> enter
+6. Uncomment line
+7. Change to *max.request.size=2097152*
+8. ctrl+x -> y -> enter
 
 </br>
 
+**Make Kafka startup quicker**
+```console
+$ cd <project-root>/kafka-commands/
+$ chmod a+x chmod-kafka.sh
+$ sudo ./chmod-kafka.sh
+```
+
 **Start Zookeper**
 ```console
-$ cd ..
-$ sudo ./kafka-commands/start-zookeeper.sh
+$ sudo ./start-zookeeper.sh
 ```
 
 **Start Kafka**
 ```console
-$ sudo ./kafka-commands/start-kafka.sh
+$ sudo ./start-kafka.sh
 ```
 
-**Stop Kafka Server and Zookeeper**
+**Stop Kafka Server and Zookeeper if needed**
 ```console 
-$ sudo ./kafka-commands/stop-kafka-and-zookeeper.sh
+$ sudo ./stop-kafka-and-zookeeper.sh
 ```
 
 **Create topics for requests and results**
 ```console
-$ sudo ./kafka-commands/create-topics.sh
+$ sudo ./create-topics.sh
 ```
 
 <br>
@@ -91,12 +104,12 @@ $ sudo ./kafka-commands/create-topics.sh
 
 **Start the consumer**
 ```console
-(venv)$ cd backend/
-(venv)$ python prediction_server.py
+(venv) $ cd <project-root>/backend/
+(venv) $ python prediction_server.py
 ```
 
 **Start the producer**
 ```console
-(venv)$ cd frontend/
-(venv)$ python api.py
+(venv) $ cd  <project-root>/frontend/
+(venv) $ python api.py
 ```

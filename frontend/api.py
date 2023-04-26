@@ -10,7 +10,14 @@ from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse
 from uvicorn import Config, Server
 
-from message_processing import checksum, chunkify_file, create_message_with_file_chunk, get_file_extension, read_file, receive_prediction_result
+from message_processing import (
+    checksum,
+    chunkify_file,
+    create_message_with_file_chunk,
+    get_file_extension,
+    read_file,
+    receive_prediction_result,
+    validate_file_content_type)
 from producer_setup import initialize_kafka, stop_kafka, get_request_sender
 
 LOGGER_PATH = Path('resources', 'logging.ini')
@@ -60,12 +67,13 @@ async def post_predict(request: Request, file: UploadFile = File(...)) -> _Templ
     '''Endpoint for uploading an audio file for prediction with POST.'''
     
     logger.debug(f'received file: {file.filename}')
+    file_extension = get_file_extension(file.filename)
     request_id = str(uuid.uuid4())
+    validate_file_content_type(request_id, file.content_type)
     file_object = file.file
     file_data = await read_file(file_object)
     file_checksum = checksum(file_data, request_id)
     request_sender = await get_request_sender()
-    file_extension = get_file_extension(file.filename)
     async for file_chunk in chunkify_file(file_data, file_extension):
         message = create_message_with_file_chunk(request_id, file_chunk, file_checksum)
         await request_sender.send_and_wait('requests_topic', message)

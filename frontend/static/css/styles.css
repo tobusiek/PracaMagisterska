@@ -11,16 +11,29 @@ body {
 form {
     display: block;
     text-align: center;
-    margin-top: 2.5em;
 }
 
-input[type=text] {
-    width: 100%;
+#inline {
+    text-align: initial;
+    margin: 0.5rem auto;
+}
+
+label {
+    vertical-align: middle;
+}
+
+input[type=file] {
+    text-align: justify;
+    font-size: 1.5rem;
+}
+
+input[type=file]::file-selector-button {
     border-radius: 15px;
-    margin-top: 1em;
+    text-decoration: none;
     padding: 0.5em;
-    font-size: 2rem;
-    vertical-align: center;
+    cursor: pointer;
+    background-color: silver;
+    color: black;
 }
 
 input[type=submit] {
@@ -28,9 +41,26 @@ input[type=submit] {
     border-radius: 15px;
     color: white;
     text-decoration: none;
-    margin-left: -4.9em;
     padding: 0.5em;
     cursor: pointer;
-    background-color: aquamarine;
-    font-size: 2rem;
+    background-color: rgb(70, 219, 169);
+    font-size: 1.5rem;
+    width: 30%;
+}
+
+a {
+    display: block;
+    text-align: center;
+}
+
+button {
+    border: none;
+    border-radius: 15px;
+    color: white;
+    text-decoration: none;
+    padding: 0.5em;
+    cursor: pointer;
+    background-color: rgb(70, 219, 169);
+    font-size: 1.5rem;
+    width: 30%;
 }
