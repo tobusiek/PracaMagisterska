@@ -18,16 +18,16 @@ form {
     margin: 0.5rem auto;
 }
 
-label {
+#inline > label {
     vertical-align: middle;
 }
 
-input[type=file] {
+#file {
     text-align: justify;
     font-size: 1.5rem;
 }
 
-input[type=file]::file-selector-button {
+#file::file-selector-button {
     border-radius: 15px;
     text-decoration: none;
     padding: 0.5em;
@@ -36,7 +36,7 @@ input[type=file]::file-selector-button {
     color: black;
 }
 
-input[type=submit] {
+#predict-btn {
     border: none;
     border-radius: 15px;
     color: white;
@@ -48,12 +48,12 @@ input[type=submit] {
     width: 30%;
 }
 
-a {
+#redirect {
     display: block;
     text-align: center;
 }
 
-button {
+#predict-again-btn {
     border: none;
     border-radius: 15px;
     color: white;
