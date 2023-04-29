@@ -35,7 +35,7 @@ def get_file_extension(filename: str) -> str:
 def validate_file_content_type(request_id: str, file_content_type: str) -> None:
     '''Validate file content type. Raise HTTP exception if file is not an audio file.'''
 
-    if file_content_type not in ('audio/mpeg', 'audio/vorbis'):
+    if 'audio/' not in file_content_type:
         logger.debug(f'Invalid file_content_type: {file_content_type} for {request_id=}')
         raise HTTPException(400, detail='Please upload audio file')
 
@@ -86,7 +86,7 @@ def create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file_
             MessageKey.FILE_EXTENSION.value: file_chunk.file_extension,
             MessageKey.CHECKSUM.value: file_checkum
         }
-    logger.info(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number} out of {file_chunk.num_of_chunks}')
+    logger.info(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number + 1} out of {file_chunk.num_of_chunks}')
     return message
 
 
