@@ -30,7 +30,7 @@ class TempFileCreator:
         return audio_au_path
 
     def create_temp_file(self, request_id: str, file_data: bytes, file_extension: str) -> Path:
-        '''Create temporary audio file. If extension is not .au, create second file in au format.'''
+        '''Create temporary audio file. If extension is not the same as dataset's audio format, create second file with proper format.'''
         
         self._create_files_temp_path()
         temp_file_name = request_id + file_extension
@@ -45,9 +45,9 @@ class TempFileCreator:
     def delete_temp_file(self, request_id: str) -> None:
         '''Delete temporary audio file(s). If extension was not the same as dataset's audio format, delete both files.'''
         
-        for dir_el in self._files_temp_path.iterdir():
-            if dir_el.is_dir():
+        for dir_element in self._files_temp_path.iterdir():
+            if dir_element.is_dir():
                 continue
-            if request_id in dir_el.name:
-                dir_el.unlink()
+            if request_id in dir_element.name:
+                dir_element.unlink()
         logger.info(f'deleted temporary audio file(s) for {request_id=}')
