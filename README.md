@@ -105,11 +105,11 @@ $ sudo ./create-topics.sh
 **Start the consumer**
 ```console
 (venv) $ cd <project-root>/predictions_server/
-(venv) $ python prediction_server.py
+(venv) $ python main.py
 ```
 
 **Start the producer**
 ```console
 (venv) $ cd  <project-root>/api_server/
-(venv) $ python api.py
+(venv) $ python main.py
 ```
