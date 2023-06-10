@@ -133,7 +133,7 @@ kafka-ml/
 stop-fastapi.sh
 .vscode
 
-predictions_server/model_testing/Data
+predictions_server/model_testing/data
 predictions_server/model_testing/temp_files
 predictions_server/model_testing/test_audio.*
 
