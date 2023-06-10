@@ -1,6 +1,4 @@
 import asyncio
-import base64
-from hashlib import sha3_224
 import logging.config
 from pathlib import Path
 
@@ -10,14 +8,11 @@ from aiokafka.structs import ConsumerRecord
 from consumer_setup import initialize_kafka, stop_kafka, get_request_receiver, get_result_sender
 from data_models import PredictionResultModel, FileChunkRequest
 from predictions.prediction_model import PredictionModel
-
+from tools.file_processing import create_file_from_chunks, fill_buffer, remove_request_from_buffer
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
 logging.getLogger('aiokafka').setLevel(logging.ERROR)
 logger = logging.getLogger('predictions')
-
-REQUESTS_BUFFER: dict[str, list[bytes]] = {}
-
 
 
 def _create_prediction_result_message(prediction_result: PredictionResultModel) -> dict[str, str | float]:
@@ -35,58 +30,11 @@ async def _send_prediction_result(prediction_result: PredictionResultModel) -> N
     logger.info(f'result sent to producer: {response}')
 
 
-def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
-    '''Decode file chunk received from producer (str) with base64 encoding.'''
-
-    return base64.b64decode(file_chunk.encode())
-
-
-def _checksum(file_data: bytes) -> str:
-    '''Checksum on file_data.'''
-
-    return sha3_224(file_data).hexdigest()
-
-
-def _compare_checksum(file_data: bytes, original_checksum: str) -> bool:
-    '''Compare original checksum with checksum after concatenation of message.'''
-
-    checksum_result = _checksum(file_data)
-    logger.debug(f'original checksum={original_checksum}, checksum after concatenating={checksum_result}')
-    return original_checksum == checksum_result
-
-
-def _create_file_from_chunks(request_id: str, original_checksum: str) -> bytes | None:
-    '''Create file from chunks if every chunk for sent file present in requests buffer.'''
-
-    request = REQUESTS_BUFFER[request_id]
-    if None in request:
-        return
-    file_data = b''.join(request)
-    logger.debug(f'got whole file for {request_id}')
-    if _compare_checksum(file_data, original_checksum):
-        logger.debug(f'checksum for {request_id=} correct')
-        return file_data
-    raise BytesWarning('checksums differ')
-
-
 async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: PredictionModel, file_extension: str) -> None:
     '''Perform prediction on received file and send the results back to producer.'''
     
     prediction_result = model.predict(request_id, file_data, file_extension)
     await _send_prediction_result(prediction_result)
-
-
-def _fill_buffer(request_id: str, num_of_chunks: int, chunk_number, chunk_data: bytes) -> None:
-    if request_id not in REQUESTS_BUFFER:
-        REQUESTS_BUFFER[request_id] = [None] * num_of_chunks
-    chunk_number = chunk_number
-    REQUESTS_BUFFER[request_id][chunk_number] = _decode_file_chunk_with_base64(chunk_data)
-
-
-def _remove_request_from_buffer(request_id: str) -> None:
-    if request_id not in REQUESTS_BUFFER:
-        return
-    REQUESTS_BUFFER.pop(request_id, None)
 
 
 async def process_messages(message: ConsumerRecord, model: PredictionModel) -> None:
@@ -96,18 +44,15 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
     message_content = message.value
     file_chunk_request = FileChunkRequest(**message_content)
     request_id = file_chunk_request.request_id
-    num_of_chunks = file_chunk_request.num_of_chunks
-    chunk_number = file_chunk_request.chunk_number
-    _fill_buffer(request_id, num_of_chunks, chunk_number, file_chunk_request.chunk_data)
-    logger.info(f'new message for {request_id=}: {chunk_number=} out of {num_of_chunks}')
+    fill_buffer(request_id, file_chunk_request)
     try:
-        file_data = _create_file_from_chunks(request_id, file_chunk_request.checksum)
+        file_data = create_file_from_chunks(request_id, file_chunk_request.checksum)
     except BytesWarning as e:
-        logger.error(f'error for{request_id=}: {e}')
-    else:
-        if file_data:
-            _remove_request_from_buffer(request_id)
-            await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
+        logger.error(e)
+        # TODO: send back message with checksum mismatch error
+    if file_data:
+        remove_request_from_buffer(request_id)
+        await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
 
 
 async def run_consumer() -> None:
@@ -121,7 +66,7 @@ async def run_consumer() -> None:
             message: ConsumerRecord = await request_receiver.getone()
             await process_messages(message, model)
         except ConsumerStoppedError:
-            return
+            return  # TODO: error handling
 
 
 async def main() -> None:

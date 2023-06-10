@@ -1,17 +1,19 @@
 import base64
-from dataclasses import dataclass
-from hashlib import sha3_224
 import logging
 import math
-from pathlib import Path
+from dataclasses import dataclass
+from hashlib import sha3_224
 from typing import AsyncGenerator, BinaryIO
 
 from aiokafka.structs import ConsumerRecord
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from producer_setup import (
+    CHUNK_SIZE,
+    MessageKey,
+    get_request_sender,
+    get_result_receiver)
 from pydantic import ValidationError
-
-from producer_setup import CHUNK_SIZE, MessageKey, get_request_sender, get_result_receiver
 
 logger = logging.getLogger('message_processor')
 
@@ -42,15 +44,15 @@ async def get_file_data(file: UploadFile, request_id: str) -> FileData:
     '''Create FileData object from requested file.'''
     
     file_content_type = file.content_type
-    validate_file_content_type(request_id, file_content_type)
+    _validate_file_content_type(request_id, file_content_type)
     file_data = await file.read()
     return FileData(
         file=file.file,
         filename=file.filename,
-        extension=get_file_extension(file.filename),
+        extension=_get_file_extension(file.filename),
         content_type=file_content_type,
         content=file_data,
-        checksum=calculate_checksum(file_data, request_id)
+        checksum=_calculate_checksum(file_data, request_id)
     )
 
 
@@ -58,18 +60,18 @@ async def send_file_chunks(file_data: FileData, request_id: str) -> None:
     '''Send file chunks to predictions' server.'''
     
     request_sender = await get_request_sender()
-    async for file_chunk in chunkify_file(file_data.content, file_data.extension):
-        message = create_message_with_file_chunk(request_id, file_chunk, file_data.checksum)
+    async for file_chunk in _chunkify_file(file_data.content, file_data.extension):
+        message = _create_message_with_file_chunk(request_id, file_chunk, file_data.checksum)
         await request_sender.send_and_wait('requests_topic', message)
 
 
-def get_file_extension(filename: str) -> str:
+def _get_file_extension(filename: str) -> str:
     '''Get the file extension of uploaded file.'''
 
-    return Path(filename).suffix
+    return filename.split('.')[-1]
 
 
-def validate_file_content_type(request_id: str, file_content_type: str) -> None:
+def _validate_file_content_type(request_id: str, file_content_type: str) -> None:
     '''Validate file content type. Raise HTTP exception if file is not an audio file.'''
 
     if 'audio/' not in file_content_type:
@@ -77,7 +79,7 @@ def validate_file_content_type(request_id: str, file_content_type: str) -> None:
         raise HTTPException(400, detail='Please upload audio file')
 
 
-async def chunkify_file(file_data: bytes, file_extension: str) -> AsyncGenerator[FileChunk, None]:
+async def _chunkify_file(file_data: bytes, file_extension: str) -> AsyncGenerator[FileChunk, None]:
     '''Create chunks from audio file to assure they fit in kafka message and yield FileChunk.'''
 
     file_size = len(file_data)
@@ -98,7 +100,7 @@ def _encode_file_chunk_with_base64(file_data_chunk: bytes) -> str:
     return base64.b64encode(file_data_chunk).decode()
 
 
-def calculate_checksum(file_data: bytes, request_id: str) -> str:
+def _calculate_checksum(file_data: bytes, request_id: str) -> str:
     '''Checksum on file_data.'''
 
     checksum_result = sha3_224(file_data).hexdigest()
@@ -106,7 +108,7 @@ def calculate_checksum(file_data: bytes, request_id: str) -> str:
     return checksum_result
 
 
-def create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file_checkum: str) -> dict[str, int | bytes | str]:
+def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file_checkum: str) -> dict[str, int | bytes | str]:
     '''Create a message with the given file chunk to be send to the prediction server.'''
     
     message = {
