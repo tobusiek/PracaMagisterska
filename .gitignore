@@ -131,10 +131,10 @@ dmypy.json
 notes.txt
 kafka-ml/
 stop-fastapi.sh
-model/Data/
-test_audio.mp3
-test_audio.wav
 .vscode
-backend/model/temp_files
-backend/model/Data
+
+predictions_server/model_testing/Data
+predictions_server/model_testing/temp_files
+predictions_server/model_testing/test_audio.*
+
 requirements-froze.txt
