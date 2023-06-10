@@ -3,7 +3,7 @@ from os import cpu_count
 from pathlib import Path
 
 
-MODEL_DIR = Path('model')
+MODEL_DIR = Path('model_testing')
 CORES_TO_USE = cpu_count() // 2
 DATASET_AUDIO_FORMAT = '.au'
 DATASET_INFO_PATH = MODEL_DIR / 'dataset_info.json'
