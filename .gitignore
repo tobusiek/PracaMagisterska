@@ -132,6 +132,8 @@ notes.txt
 kafka-ml/
 stop-fastapi.sh
 .vscode
+fma_medium.zip
+fma_metadata.zip
 
 predictions_server/model_testing/data
 predictions_server/model_testing/temp_files
