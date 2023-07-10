@@ -135,6 +135,7 @@ stop-fastapi.sh
 fma_medium.zip
 fma_metadata.zip
 fma-master.zip
+papers/
 
 predictions_server/model_testing/data/FMA/fma_medium
 predictions_server/model_testing/data/FMA/fma_metadata

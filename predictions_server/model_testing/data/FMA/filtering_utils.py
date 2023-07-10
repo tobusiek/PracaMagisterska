@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.express as px
 import os
 
-DS_PATH = os.getcwd() + "/fma_metadata/"
+DS_PATH = os.path.join(os.getcwd() + '/fma_metadata/')
 
 
 def get_value_counts(df: pd.DataFrame, col_name: str | tuple[str, ...], min_occurrences: int = 0) -> dict[str | int | float, int]:

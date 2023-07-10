@@ -240,7 +240,8 @@ def get_audio_path(audio_dir, track_id):
 
     """
     tid_str = '{:06d}'.format(track_id)
-    return os.path.join(audio_dir, tid_str[:3], tid_str + '.mp3')
+    track_path = os.path.join(audio_dir, tid_str[:3], tid_str + '.mp3')
+    return track_path
 
 
 class Loader:
@@ -313,7 +314,8 @@ def build_sample_loader(audio_dir, Y, loader):
             self.batch_rearmost = sharedctypes.RawValue(ctypes.c_int, -1)
             self.condition = multiprocessing.Condition(lock=self.lock2)
 
-            data = sharedctypes.RawArray(ctypes.c_int, tids.data)
+            # data = sharedctypes.RawArray(ctypes.c_int, tids.data)
+            data = sharedctypes.RawArray(ctypes.c_int, tids.values)
             self.tids = np.ctypeslib.as_array(data)
 
             self.batch_size = batch_size
