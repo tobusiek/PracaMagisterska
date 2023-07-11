@@ -139,6 +139,7 @@ papers/
 
 predictions_server/model_testing/data/FMA/fma_medium
 predictions_server/model_testing/data/FMA/fma_metadata
+predictions_server/model_testing/data/FMA/pickled_spectrograms
 
 predictions_server/model_testing/data/GTZAN/genres_original
 predictions_server/model_testing/data/GTZAN/images_original
