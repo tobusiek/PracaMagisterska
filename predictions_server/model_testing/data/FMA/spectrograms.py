@@ -1,15 +1,11 @@
-from collections.abc import Generator
-from functools import lru_cache
 import os
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="librosa")
+warnings.filterwarnings("ignore", category=FutureWarning, module="librosa")
 
 from audioread.exceptions import NoBackendError
-import keras.utils
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, Input
-from keras.callbacks import EarlyStopping
 import librosa
 import numpy as np
-import pandas as pd
 import soundfile as sf
 
 from fma_code import utils as fma_utils
@@ -51,9 +47,13 @@ def load_melspectrogram(audio: np.ndarray, sampling_rate: int = SAMPLING_RATE) -
     return librosa.power_to_db(mel_spectrogram)
 
 
-def generate_track_melspectrograms(track_id: int, split_duration: float = SPLIT_DURATION, max_shape: tuple[int, int] = (0, 0)) -> np.ndarray | None:
+def generate_track_melspectrograms(
+        audio: np.ndarray,
+        sampling_rate: int = SAMPLING_RATE,
+        split_duration: float = SPLIT_DURATION,
+        max_shape: tuple[int, int] = (0, 0)
+    ) -> np.ndarray | None:
     track_melspectrograms = []
-    audio, sampling_rate = load_audio_file(track_id)
     
     if not isinstance(audio, np.ndarray):
         return None
@@ -89,12 +89,26 @@ def generate_track_mfcc_spectrograms(track_id: int, split_duration: float = 3.0)
 """
 
 
-def pickle_spectrograms_set(X: np.ndarray, y: np.ndarray, filename: str, repopulate: bool = REPOPULATE) -> None:
+def pickle_spectrograms_set(
+        X: np.ndarray,
+        y: np.ndarray,
+        filename: str,
+        compressed: bool = False,
+        repopulate: bool = REPOPULATE
+    ) -> None:
     if not os.path.exists(SPECTROGRAMS_PATH):
         os.mkdir(SPECTROGRAMS_PATH)
+
+    set_filename = f'{filename}_{SPLIT_DURATION}s'
+    if compressed:
+        set_filename += '_compressed'
     
-    set_path = os.path.join(SPECTROGRAMS_PATH, f'{filename}_{SPLIT_DURATION}s.npz')
+    set_path = os.path.join(SPECTROGRAMS_PATH, f'{set_filename}.npz')
     if os.path.exists(set_path) and not repopulate:
         print(f'File exists in: {set_path}. Repopulation set to false, returning.')
         return
-    np.savez_compressed(set_path, X=X, y=y)
+    
+    if compressed:
+        np.savez_compressed(set_path, X=X, y=y)
+    else:
+        np.savez(set_path, X=X, y=y)

@@ -1,4 +1,4 @@
-# Intructions for freshly installed Ubuntu 22.04 LTS
+# Instructions for freshly installed Ubuntu 22.04 LTS
 
 ## Start with updating packages
 ```console
@@ -9,7 +9,7 @@ $ sudo apt-get install ffmpeg
 <br>
 
 ## Python setup
-**Instalation**
+**Installation**
 ```console
 $ sudo apt install python3.10
 $ python3.10 --version  # verify python version
@@ -69,7 +69,7 @@ $ sudo nano producer.properties
 7. Change to *max.request.size=2097152*
 8. ctrl+x -> y -> enter
 
-</br>
+<br>
 
 **Make Kafka startup quicker**
 ```console
@@ -78,7 +78,7 @@ $ chmod a+x chmod-kafka.sh
 $ sudo ./chmod-kafka.sh
 ```
 
-**Start Zookeper**
+**Start Zookeeper**
 ```console
 $ sudo ./start-zookeeper.sh
 ```
