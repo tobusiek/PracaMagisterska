@@ -1,11 +1,8 @@
 import os
-from re import S
 
 import numpy as np
 import pandas as pd
 from tensorflow_addons.metrics import F1Score
-from keras.optimizers import Adam
-Adam()
 
 from utils import DS_PATH
 
