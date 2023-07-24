@@ -132,14 +132,19 @@ notes.txt
 kafka-ml/
 stop-fastapi.sh
 .vscode
+.idea
+.ignore
 fma_medium.zip
+fma_small.zip
 fma_metadata.zip
 fma-master.zip
 papers/
 
 predictions_server/model_testing/data/FMA/fma_medium
+predictions_server/model_testing/data/FMA/fma_small
 predictions_server/model_testing/data/FMA/fma_metadata
 predictions_server/model_testing/data/FMA/pickled_spectrograms
+predictions_server/model_testing/models_backup.zip
 
 predictions_server/model_testing/data/GTZAN/genres_original
 predictions_server/model_testing/data/GTZAN/images_original

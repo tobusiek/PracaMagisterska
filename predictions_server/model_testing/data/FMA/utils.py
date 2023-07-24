@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,7 +7,7 @@ import pandas as pd
 import plotly.express as px
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-DS_PATH = os.path.join(os.getcwd() + '/fma_metadata/')
+DS_PATH = os.path.join(os.getcwd(), 'fma_metadata')
 MODELS_PATH = os.path.dirname(os.path.dirname(os.getcwd()))
 
 
@@ -26,7 +27,7 @@ def draw_pie(df: pd.DataFrame, col_name: str, min_occurrences: int = 0) -> None:
     fig.show()
 
 
-def draw_training_history(model_history: dict, metric: str) -> None:
+def draw_training_history(model_name: str, model_history: dict, metric: str = 'accuracy') -> None:
     train_acc = model_history[metric]
     val_acc = model_history[f'val_{metric}']
     train_loss = model_history['loss']
@@ -42,7 +43,7 @@ def draw_training_history(model_history: dict, metric: str) -> None:
     plt.plot(epochs, val_acc, label=f'Validation {metric}')
     plt.xlabel('Epochs')
     plt.ylabel(metric)
-    plt.title(f'Training and Validation {metric}')
+    plt.title(f'{model_name.capitalize()} Training and Validation {metric}')
     plt.legend(loc='lower right')
 
     plt.subplot(2, 1, 2)
@@ -50,16 +51,19 @@ def draw_training_history(model_history: dict, metric: str) -> None:
     plt.plot(epochs, val_loss, label='Validation Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
+    plt.title(model_name.capitalize() + ' Training and Validation Loss')
     plt.legend(loc='upper right')
 
     plt.tight_layout()
     plt.show()
+    plt.savefig(os.path.join(MODELS_PATH, '_'.join(model_name.split(' ')) + '.png'))
 
 
 def draw_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str]) -> None:
-    length_difference = len(y_true) - len(y_pred)
-    cm = confusion_matrix(y_true[:-length_difference].argmax(axis=1), y_pred.argmax(axis=1))
+    if len(y_true) > len(y_pred):
+        length_difference = len(y_true) - len(y_pred)
+        y_true = y_true[:-length_difference]
+    cm = confusion_matrix(y_true.argmax(axis=1), y_pred.argmax(axis=1))
     cm_display = ConfusionMatrixDisplay(cm, display_labels=labels)
 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -74,4 +78,16 @@ def draw_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, labels: list[s
 
 
 def create_model_path(model_name: str) -> str:
-    return os.path.join(MODELS_PATH, f'{model_name}.h5')
+    return os.path.join(MODELS_PATH, model_name + '.h5')
+
+
+def save_model_history(model_name: str, models_history: dict[str, float]) -> None:
+    models_history_path = os.path.join(MODELS_PATH, model_name + '.pickle')
+    with open(models_history_path, 'wb+') as models_history_file:
+        return pickle.dump(models_history, models_history_file)
+
+
+def load_model_history(model_name: str) -> dict[str, float]:
+    models_history_path = os.path.join(MODELS_PATH, model_name + '.pickle')
+    with open(models_history_path, 'rb') as models_history_file:
+        return pickle.load(models_history_file)

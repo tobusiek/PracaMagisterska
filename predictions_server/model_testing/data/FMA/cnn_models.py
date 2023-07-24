@@ -1,10 +1,13 @@
+from typing import Callable
+
 from keras.backend import clear_session
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 import keras.utils
-from numba import cuda
 import numpy as np
 
-from utils import create_model_path
+from utils import create_model_path, save_model_history
+
+BATCH_SIZE = 128
 
 
 class SpectrogramGenerator(keras.utils.Sequence):
@@ -13,7 +16,7 @@ class SpectrogramGenerator(keras.utils.Sequence):
             tracks_spectrograms: np.ndarray,
             labels: np.ndarray,
             sample_duration: float = 3.0,
-            batch_size: int = 128,
+            batch_size: int = BATCH_SIZE,
             shuffle: bool = True,
             to_fit: bool = True
         ) -> None:
@@ -22,6 +25,7 @@ class SpectrogramGenerator(keras.utils.Sequence):
         self._sample_duration = sample_duration
         self._tracks_spectrograms_shape = tracks_spectrograms[0].shape
         self._batch_size = batch_size
+        if not to_fit: shuffle = False
         self._shuffle = shuffle
         self._to_fit = to_fit
         self.on_epoch_end()
@@ -64,43 +68,41 @@ class SpectrogramGenerator(keras.utils.Sequence):
         return y
 
 
-def reinit_gpu():
-    clear_session()
-    cuda.select_device(0)
-    cuda.close()
-
-
-def compile_model(model: keras.Model) -> keras.Model:
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+def compile_model(model: keras.Model, metric: str = 'accuracy') -> keras.Model:
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=[metric])
     print(model.summary())
     return model
 
 
 def train_models(
-        models_with_names: dict[str, keras.Model],
+        models_creators: dict[str, Callable[[None], keras.Model]],
         training_data_generator: SpectrogramGenerator,
-        metric: str = 'accuracy',
         validation_data_generator: SpectrogramGenerator = None,
-        batch_size: int = 128,
+        batch_size: int = BATCH_SIZE,
         shuffle: bool = True,
         epochs: int = 100,
         early_stopping_patience: int = 5,
+        early_stopping_monitor: str = 'loss',
+        model_checkpoint_monitor: str = 'accuracy',
         reduce_learning_rate: bool = True,
+        reduce_lr_monitor: str = 'accuracy',
         reduce_lr_patience: int = 5,
         start_epoch: int = 10,
         verbose: int = 1
 ) -> dict[str, tuple[keras.Model, dict[str, float]]]:
     models_training_info: dict[str, tuple[keras.Model, dict[str, float]]] = {}
-    for model_name, model in models_with_names.items():
+    for model_name, model_creator in models_creators.items():
         model_path = create_model_path(model_name)
         print('Model', model_name)
         model, model_history = train_model(
-            model, training_data_generator, model_path, metric,
+            model_creator(), training_data_generator, model_path,
             validation_data_generator, batch_size, shuffle, epochs,
-            early_stopping_patience, reduce_learning_rate, reduce_lr_patience,
-            start_epoch, verbose
+            early_stopping_patience, early_stopping_monitor,
+            model_checkpoint_monitor, reduce_learning_rate, reduce_lr_patience,
+            reduce_lr_monitor, start_epoch, verbose
         )
-        models_training_info[model_name] = model, model_history
+        save_model_history(model_name, model_history)
+        models_training_info[model_name] = model_history
         print()
     return models_training_info
 
@@ -109,34 +111,39 @@ def train_model(
         model: keras.Model,
         training_data_generator: SpectrogramGenerator,
         model_filepath: str,
-        metric: str = 'accuracy',
         validation_data_generator: SpectrogramGenerator = None,
-        batch_size: int = 128,
+        batch_size: int = BATCH_SIZE,
         shuffle: bool = True,
         epochs: int = 100,
         early_stopping_patience: int = 5,
+        early_stopping_monitor: str = 'loss',
+        model_checkpoint_monitor: str = 'accuracy',
         reduce_learning_rate: bool = True,
         reduce_lr_patience: int = 5,
+        reduce_lr_monitor: str = 'accuracy',
         start_epoch: int = 10,
         verbose: int = 1
     ) -> tuple[keras.Model, dict]:
-    callbacks = None
-
     if validation_data_generator:
-        callbacks = [
-            EarlyStopping(
-                patience=early_stopping_patience, monitor='val_loss', mode='min',
-                restore_best_weights=True, start_from_epoch=start_epoch, verbose=verbose),
-            ModelCheckpoint(
-                model_filepath, monitor=f'val{metric}', mode='max', verbose=0,
-                save_best_only=True)
-        ]
+        early_stopping_monitor = 'val_' + early_stopping_monitor
+        model_checkpoint_monitor = 'val_' + model_checkpoint_monitor
+        reduce_lr_monitor = 'val_' + reduce_lr_monitor
+
+    callbacks = [
+        EarlyStopping(
+            patience=early_stopping_patience, monitor=early_stopping_monitor,
+            mode='min', restore_best_weights=True,
+            start_from_epoch=start_epoch, verbose=verbose),
+        ModelCheckpoint(
+           model_filepath, monitor=model_checkpoint_monitor, mode='max',
+            verbose=0, save_best_only=True)
+    ]
         
-        if reduce_learning_rate:
-            callbacks.append(ReduceLROnPlateau(
-                monitor=f'val_{metric}', mode='max', factor=0.5,
-                patience=reduce_lr_patience, verbose=verbose, min_lr=1e-6)
-            )
+    if reduce_learning_rate:
+        callbacks.append(ReduceLROnPlateau(
+            monitor=reduce_lr_monitor, mode='max', factor=0.5,
+            patience=reduce_lr_patience, verbose=verbose, min_lr=1e-6)
+        )
 
     model_fit = model.fit(
         training_data_generator,
@@ -148,15 +155,27 @@ def train_model(
         callbacks=callbacks
     )
 
-    reinit_gpu()
+    clear_session()
 
     return model, model_fit.history
+
+
+def evaluate_saved_models(
+        models_names: list[str],
+        test_data_generator: SpectrogramGenerator,
+        batch_size: int = BATCH_SIZE
+    ) -> None:
+    for model_name in models_names:
+        model_path = create_model_path(model_name)
+        model = keras.models.load_model(model_path)
+        evaluation = evaluate_model(model, test_data_generator, batch_size)
+        print('Model', model_name, evaluation)
 
 
 def evaluate_model(
         model: keras.Model,
         test_data_generator: SpectrogramGenerator,
-        batch_size: int = 128
+        batch_size: int = BATCH_SIZE
     ) -> dict[str, float]:
     evaluation = model.evaluate(test_data_generator, batch_size=batch_size, return_dict=True)
     return evaluation
@@ -164,11 +183,7 @@ def evaluate_model(
 
 def model_prediction(
         model: keras.Model,
-        x_test: np.ndarray,
-        y_test: np.ndarray,
-        sample_duration: float = 3.0,
-        batch_size: int = 128
+        test_data_generator: SpectrogramGenerator,
+        batch_size: int = BATCH_SIZE
     ) -> np.ndarray:
-    test_data_generator = SpectrogramGenerator(
-        x_test, y_test, sample_duration, batch_size, shuffle=False, to_fit=True)
     return model.predict(test_data_generator, batch_size=batch_size)

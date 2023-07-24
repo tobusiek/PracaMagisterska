@@ -1,6 +1,6 @@
 import os
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="librosa")
+warnings.filterwarnings("error", category=UserWarning, module="librosa")
 warnings.filterwarnings("ignore", category=FutureWarning, module="librosa")
 
 from audioread.exceptions import NoBackendError
@@ -34,12 +34,18 @@ def trim_audio(audio: np.ndarray) -> np.ndarray:
 
 def calculate_splits_count(audio: np.ndarray, sampling_rate: int = SAMPLING_RATE, split_duration: float = SPLIT_DURATION) -> int:
     total_duration = librosa.get_duration(y=audio, sr=sampling_rate, n_fft=N_FFT, hop_length=HOP_LENGTH)
-    return total_duration // split_duration + 1
+    return total_duration // split_duration
 
 
 def split_audio(audio: np.ndarray, sampling_rate: int = SAMPLING_RATE, split_duration: float = SPLIT_DURATION) -> list[np.ndarray]:
     n_splits = calculate_splits_count(audio, sampling_rate, split_duration)
+    if n_splits <= 0:
+        return []
     return np.array_split(audio, n_splits)
+
+
+def trim_split(split: np.ndarray, sampling_rate: int = SAMPLING_RATE, split_duration: float = SPLIT_DURATION) -> np.ndarray:
+    return split[:int(sampling_rate * split_duration)]
 
 
 def load_melspectrogram(audio: np.ndarray, sampling_rate: int = SAMPLING_RATE) -> np.ndarray:
@@ -61,8 +67,12 @@ def generate_track_melspectrograms(
     trimmed_audio = trim_audio(audio)
     audio_splits = split_audio(trimmed_audio, sampling_rate, split_duration)
     
+    if not audio_splits:
+        return None
+
     for split in audio_splits:
-        melspectrogram = load_melspectrogram(split, sampling_rate)
+        trimmed_split = trim_split(split)
+        melspectrogram = load_melspectrogram(trimmed_split, sampling_rate)
         if melspectrogram.shape > max_shape:
             max_shape = melspectrogram.shape
         track_melspectrograms.append(melspectrogram)
