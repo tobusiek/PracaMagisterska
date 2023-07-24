@@ -1,18 +1,25 @@
 import asyncio
 import logging.config
 from pathlib import Path
+from typing import Protocol
 
 from aiokafka import ConsumerStoppedError
 from aiokafka.structs import ConsumerRecord
 
 from consumer_setup import initialize_kafka, stop_kafka, get_request_receiver, get_result_sender
 from data_models import PredictionResultModel, FileChunkRequest
-from predictions.prediction_model import PredictionModel
+# from predictions.prediction_features_model import PredictionFeaturesModel
+from predictions.prediction_spectrograms_model import PredictionSpectrogramsModel
 from tools.file_processing import create_file_from_chunks, fill_buffer, remove_request_from_buffer
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
 logging.getLogger('aiokafka').setLevel(logging.ERROR)
 logger = logging.getLogger('predictions')
+
+
+class PredictionModel(Protocol):
+    def predict(self, request_id: str, file_data: bytes, file_extension: str):
+        ...
 
 
 def _create_prediction_result_message(prediction_result: PredictionResultModel) -> dict[str, str | float]:
@@ -60,7 +67,8 @@ async def run_consumer() -> None:
 
     await initialize_kafka()
     request_receiver = await get_request_receiver()
-    model = PredictionModel()
+    # model = PredictionFeaturesModel()
+    model = PredictionSpectrogramsModel()
     while True:
         try:
             message: ConsumerRecord = await request_receiver.getone()

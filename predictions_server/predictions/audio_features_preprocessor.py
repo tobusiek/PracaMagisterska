@@ -17,18 +17,18 @@ from tools.const_variables import DATASET_INFO, CORES_TO_USE
 logger = logging.getLogger('preprocessor')
 
 
-class AudioPreprocessor:
-    '''Class for audio preprocessing.'''
+class AudioFeaturesPreprocessor:
+    '''Class for audio features preprocessing.'''
 
     _temp_file_creator = TempFileCreator()
     _dataset_features: dict[str, dict[str, float]] = DATASET_INFO['features']
     _dataset_column_names: list[str] = list(_dataset_features.keys())
-    _length_of_dataset_records = DATASET_INFO['length_of_records']
+    _length_of_dataset_records = DATASET_INFO['split_duration']
     
     _features_without_mfcc_and_tempo: list[Callable[[np.ndarray], float]] = [
         chroma_stft, rms, spectral_centroid, spectral_bandwidth,
         spectral_rolloff, zero_crossing_rate, harmonic
-        ]
+    ]
 
     def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> pd.DataFrame:
         '''Create temporary file from bytes, load it with librosa, trim it, make a dataframe, minmax features and delete temporary file.'''

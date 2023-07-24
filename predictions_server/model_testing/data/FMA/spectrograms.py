@@ -1,6 +1,6 @@
 import os
 import warnings
-warnings.filterwarnings("error", category=UserWarning, module="librosa")
+warnings.filterwarnings("ignore", category=UserWarning, module="librosa")
 warnings.filterwarnings("ignore", category=FutureWarning, module="librosa")
 
 from audioread.exceptions import NoBackendError

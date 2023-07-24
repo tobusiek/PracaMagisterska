@@ -1,0 +1,19 @@
+{
+    "labels": [
+        "Electronic",
+        "Experimental",
+        "Folk",
+        "Hip-Hop",
+        "Instrumental",
+        "International",
+        "Pop",
+        "Rock"
+    ],
+    "split_duration": 3.0,
+    "sampling_rate": 22050,
+    "n_fft": 2048,
+    "hop_length": 512,
+    "audio_format": ".mp3",
+    "spectrogram_shape": [128, 130],
+    "features": {}
+}
