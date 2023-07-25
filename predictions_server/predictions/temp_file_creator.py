@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydub import AudioSegment
 
-from tools.const_variables import DATASET_INFO, MODEL_DIR
+from tools.const_variables import FMA_DATASET_INFO, MODEL_DIR
 
 logger = logging.getLogger('file_creator')
 
@@ -12,7 +12,7 @@ class TempFileCreator:
     '''Class for creating temporary files.'''
 
     _temp_files_path = MODEL_DIR / 'temp_files'
-    _dataset_audio_format: str = DATASET_INFO['audio_format']
+    _dataset_audio_format: str = FMA_DATASET_INFO['audio_format']
 
     def _create_files_temp_path(self) -> None:
         '''Create directory for temporary files if not exists.'''

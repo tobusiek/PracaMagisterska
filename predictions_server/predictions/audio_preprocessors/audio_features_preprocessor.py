@@ -11,8 +11,8 @@ from librosa.feature import (
 import numpy as np
 import pandas as pd
 
-from .temp_file_creator import TempFileCreator
-from tools.const_variables import DATASET_INFO, CORES_TO_USE
+from predictions.temp_file_creator import TempFileCreator
+from tools.const_variables import FMA_DATASET_INFO, CORES_TO_USE
 
 logger = logging.getLogger('preprocessor')
 
@@ -21,16 +21,16 @@ class AudioFeaturesPreprocessor:
     '''Class for audio features preprocessing.'''
 
     _temp_file_creator = TempFileCreator()
-    _dataset_features: dict[str, dict[str, float]] = DATASET_INFO['features']
+    _dataset_features: dict[str, dict[str, float]] = FMA_DATASET_INFO['features']
     _dataset_column_names: list[str] = list(_dataset_features.keys())
-    _length_of_dataset_records = DATASET_INFO['split_duration']
+    _length_of_dataset_records = FMA_DATASET_INFO['split_duration']
     
     _features_without_mfcc_and_tempo: list[Callable[[np.ndarray], float]] = [
         chroma_stft, rms, spectral_centroid, spectral_bandwidth,
         spectral_rolloff, zero_crossing_rate, harmonic
     ]
 
-    def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> pd.DataFrame:
+    def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> np.ndarray:
         '''Create temporary file from bytes, load it with librosa, trim it, make a dataframe, minmax features and delete temporary file.'''
 
         logger.info(f'preprocessing audio for {request_id=}...')
@@ -42,7 +42,7 @@ class AudioFeaturesPreprocessor:
         audio_df = self._minmax_audio_df(audio_df)
         audio_df = self._convert_audio_df_to_float32(audio_df)
         self._temp_file_creator.delete_temp_file(request_id)
-        return audio_df
+        return audio_df.to_numpy()
     
     @staticmethod
     def _trim_audio(audio: np.ndarray) -> np.ndarray:

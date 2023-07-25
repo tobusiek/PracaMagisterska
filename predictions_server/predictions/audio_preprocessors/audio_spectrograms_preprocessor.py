@@ -10,24 +10,24 @@ import librosa
 import numpy as np
 import soundfile as sf
 
-from .temp_file_creator import TempFileCreator
-from tools.const_variables import DATASET_INFO, CORES_TO_USE
+from predictions.temp_file_creator import TempFileCreator
+from tools.const_variables import FMA_DATASET_INFO, CORES_TO_USE
 
 logger = logging.getLogger('preprocessor')
 
 
 class AudioSpectrogramsPreprocessor:
-    'Class for audio spectrograms preprocessing.'
+    """Class for audio spectrograms preprocessing."""
 
     _temp_file_creator = TempFileCreator()
-    _split_duration: float = DATASET_INFO['split_duration']
-    _sampling_rate: int = DATASET_INFO['sampling_rate']
-    _n_fft: int = DATASET_INFO['n_fft']
-    _hop_length: int = DATASET_INFO['hop_length']
-    _spectrogram_shape: tuple[int, int] = tuple(DATASET_INFO['spectrogram_shape'])
+    _split_duration: float = FMA_DATASET_INFO['split_duration']
+    _sampling_rate: int = FMA_DATASET_INFO['sampling_rate']
+    _n_fft: int = FMA_DATASET_INFO['n_fft']
+    _hop_length: int = FMA_DATASET_INFO['hop_length']
+    _spectrogram_shape: tuple[int, int] = tuple(FMA_DATASET_INFO['spectrogram_shape'])
 
     def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> np.ndarray:
-        '''Create temporary file from bytes, load it with librosa, trim it, make spectrograms and delete temporary file.'''
+        """Create temporary file from bytes, load it with librosa, trim it, make spectrograms and delete temporary file."""
 
         logger.info(f'preprocessing audio for {request_id=}...')
         temp_file_path = self._temp_file_creator.create_temp_file(
@@ -38,10 +38,10 @@ class AudioSpectrogramsPreprocessor:
             raise BytesWarning('corrupted audio file')
         return self._generate_track_melspectrograms(audio)
     
-    def _load_audio_file(self, file_path: Path) -> tuple[np.ndarray, int] | tuple[None, None]:
+    def _load_audio_file(self, file_path: Path) -> tuple[np.ndarray, float] | tuple[None, None]:
         try:
             return librosa.load(file_path, sr=self._sampling_rate, mono=True)
-        except (FileNotFoundError, sf.LibsndfileError, NoBackendError) as e:
+        except (FileNotFoundError, sf.LibsndfileError, NoBackendError):
             return None, None
 
     def _generate_track_melspectrograms(self, audio: np.ndarray) -> np.ndarray | None:
@@ -66,7 +66,8 @@ class AudioSpectrogramsPreprocessor:
                 track_melspectrograms.append(melspectrogram)
         
         for idx, melspectrogram in enumerate(track_melspectrograms):
-            if melspectrogram.shape == spectrogram_shape: continue
+            if melspectrogram.shape == spectrogram_shape:
+                continue
             track_melspectrograms[idx] = np.resize(melspectrogram, spectrogram_shape)
 
         return np.array(track_melspectrograms, dtype=np.float16)
@@ -81,7 +82,7 @@ class AudioSpectrogramsPreprocessor:
             return []
         return np.array_split(audio, n_splits)
     
-    def _calculate_splits_count(self, audio: np.ndarray) -> int:
+    def _calculate_splits_count(self, audio: np.ndarray) -> float:
         total_duration = librosa.get_duration(
             y=audio,
             sr=self._sampling_rate,

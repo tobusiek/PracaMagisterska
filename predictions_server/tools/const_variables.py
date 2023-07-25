@@ -2,9 +2,9 @@ from json import load
 from os import cpu_count
 from pathlib import Path
 
-
-MODEL_DIR = Path('model_testing', 'data', 'FMA', 'models')
+FMA_OR_GTZAN = 'FMA'
+MODEL_DIR = Path('model_testing', 'data', FMA_OR_GTZAN, 'models')
 CORES_TO_USE = cpu_count() // 2
-DATASET_INFO_PATH = Path('model_testing', 'data', 'FMA', 'dataset_info.json')
-with open(DATASET_INFO_PATH) as dataset_info:
-    DATASET_INFO: dict = load(dataset_info)
+FMA_DATASET_INFO_PATH = Path('model_testing', 'data', FMA_OR_GTZAN, 'dataset_info.json')
+with open(FMA_DATASET_INFO_PATH) as fma_dataset_info:
+    FMA_DATASET_INFO: dict = load(fma_dataset_info)
