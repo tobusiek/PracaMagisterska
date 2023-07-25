@@ -16,8 +16,9 @@ GenresPrediction = namedtuple('GenresPrediction', ('genre', 'genre_result'))
 
 
 class BasePredictionModel(ABC):
-    def __init__(self, model_path: Path, model: Model, audio_preprocessor: BaseAudioPreprocessor, labels: list[str]):
-        self._model_path = model_path
+    """Base class for models to make prediction given audio file."""
+
+    def __init__(self, model: Model, audio_preprocessor: BaseAudioPreprocessor, labels: list[str]):
         self._model = model
         self._audio_preprocessor = audio_preprocessor
         self._labels = labels
@@ -44,15 +45,32 @@ class BasePredictionModel(ABC):
         logger.info(f'prediction result for {request_id=}: {prediction_result}')
         return prediction_result
 
-    def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> tuple[
-        GenresPrediction, ...]:
+    # def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> tuple[
+    #     GenresPrediction, ...]:
+    #     '''Get n largest means from model prediction.'''
+    #
+    #     predicted_genres_means = [np.mean(prediction_for_genre) for prediction_for_genre in prediction.T]
+    #     largest_means_of_predicted_genres = nlargest(self._genres_to_take, predicted_genres_means)
+    #     indices_of_n_largest_means = [np.where(predicted_genres_means == nth_max)[0][0] for nth_max in largest_means_of_predicted_genres]
+    #     logger.debug(f'largest means: {largest_means_of_predicted_genres}, indices for genres with largest means: {indices_of_n_largest_means}')
+    #     return tuple(GenresPrediction(genre=self._labels[idx], genre_result=round(100 * nth_largest_mean, 2))
+    #                  for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres))
+
+    def _get_n_predictions_with_largest_means(self, prediction: np.ndarray) -> tuple:
         '''Get n largest means from model prediction.'''
 
-        predicted_genres_means = [np.mean(prediction_for_genre) for prediction_for_genre in prediction.T]
-        largest_means_of_predicted_genres = nlargest(self._genres_to_take, predicted_genres_means)
-        indices_of_n_largest_means = [
-            np.where(predicted_genres_means == nth_max)[0][0]
-            for nth_max in largest_means_of_predicted_genres]
-        logger.debug(f'largest means: {largest_means_of_predicted_genres}, indices for genres with largest means: {indices_of_n_largest_means}')
-        return tuple(GenresPrediction(genre=self._labels[idx], genre_result=round(100 * nth_largest_mean, 2))
-                     for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres))
+        predicted_genres_means = np.mean(prediction, axis=0)
+        largest_means_indices = np.argsort(predicted_genres_means)[::-1][-self._genres_to_take:]
+        largest_means_values = predicted_genres_means[largest_means_indices]
+
+        genres_predictions = (
+            GenresPrediction(
+                genre=self._labels[idx],
+                genre_result=round(100 * mean, 2)
+            )
+            for idx, mean in zip(largest_means_indices, largest_means_values)
+        )
+
+        logger.debug(
+            f'largest means: {largest_means_values}, indices for genres with largest means: {largest_means_indices}')
+        return tuple(genres_predictions)

@@ -3,7 +3,7 @@ import multiprocessing as mp
 from typing import Callable
 
 import librosa
-from librosa.effects import harmonic, trim
+from librosa.effects import harmonic
 from librosa.feature import (
     chroma_stft, rms, spectral_centroid, spectral_bandwidth,
     spectral_rolloff, zero_crossing_rate, tempo, mfcc
@@ -11,19 +11,18 @@ from librosa.feature import (
 import numpy as np
 import pandas as pd
 
-from predictions.temp_file_creator import TempFileCreator
-from tools.const_variables import FMA_DATASET_INFO, CORES_TO_USE
+from predictions.audio_preprocessors.base_audio_preprocessor import BaseAudioPreprocessor
+from tools.const_variables import GTZAN_DATASET_INFO, CORES_TO_USE
 
 logger = logging.getLogger('preprocessor')
 
 
-class AudioFeaturesPreprocessor:
+class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
     '''Class for audio features preprocessing.'''
 
-    _temp_file_creator = TempFileCreator()
-    _dataset_features: dict[str, dict[str, float]] = FMA_DATASET_INFO['features']
+    _dataset_features: dict[str, dict[str, float]] = GTZAN_DATASET_INFO['features']
     _dataset_column_names: list[str] = list(_dataset_features.keys())
-    _length_of_dataset_records = FMA_DATASET_INFO['split_duration']
+    _length_of_dataset_records = GTZAN_DATASET_INFO['split_duration']
     
     _features_without_mfcc_and_tempo: list[Callable[[np.ndarray], float]] = [
         chroma_stft, rms, spectral_centroid, spectral_bandwidth,
@@ -44,11 +43,7 @@ class AudioFeaturesPreprocessor:
         self._temp_file_creator.delete_temp_file(request_id)
         return audio_df.to_numpy()
     
-    @staticmethod
-    def _trim_audio(audio: np.ndarray) -> np.ndarray:
-        '''Trim audio to get rid of silent parts.'''
 
-        return trim(audio)[0]
     
     @staticmethod
     def _get_mean_and_var(feature: np.ndarray) -> tuple[float, float]:
@@ -62,11 +57,6 @@ class AudioFeaturesPreprocessor:
         n_splits = len(audio) // self._length_of_dataset_records
         logger.debug(f'audio splitted to {n_splits} splits')
         return np.array_split(audio, n_splits)
-    
-    def _trim_split(self, split: np.ndarray) -> np.ndarray:
-        '''Trim the split to fit length of dataset records.'''
-
-        return split[:self._length_of_dataset_records]
     
     def _get_features_for_split(self, split: np.ndarray) -> np.ndarray:
         '''Get features for split that were used in dataset.'''
