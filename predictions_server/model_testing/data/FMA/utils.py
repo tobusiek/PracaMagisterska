@@ -8,7 +8,7 @@ import plotly.express as px
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 DS_PATH = os.path.join(os.getcwd(), 'fma_metadata')
-MODELS_PATH = os.path.dirname(os.path.dirname(os.getcwd()))
+MODELS_PATH = os.path.join(os.getcwd(), 'models')
 
 
 def get_value_counts(df: pd.DataFrame, col_name: str | tuple[str, ...], min_occurrences: int = 0) -> dict[str | int | float, int]:
