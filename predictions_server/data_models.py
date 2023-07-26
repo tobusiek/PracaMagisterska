@@ -22,11 +22,6 @@ class PredictionResultModel:
     first_genre_result: float
     second_genre: str
     second_genre_result: float
-    # third_genre: str
-    # third_genre_result: float
-
-    def make_dict(self) -> dict[str, str | float]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -36,9 +31,7 @@ class ResultResponse:
     result: PredictionResultModel | str
 
     def make_dict(self) -> dict[str, str | float]:
-        response = asdict(self)
-        response.update(self.result.make_dict())
-        return response
+        return asdict(self)
 
 
 class PredictionModel(Protocol):

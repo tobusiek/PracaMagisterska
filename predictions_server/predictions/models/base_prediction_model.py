@@ -28,7 +28,7 @@ class BasePredictionModel(ABC):
 
         logger.debug(f'making prediction for {request_id=}...')
         processed_audio = self._audio_preprocessor.preprocess_audio(request_id, file_data, file_extension)
-        if not processed_audio:
+        if not isinstance(processed_audio, np.ndarray):
             return None
         prediction = self._model.predict(processed_audio)
         return self._create_prediction_result_model(request_id, prediction)
@@ -61,7 +61,7 @@ class BasePredictionModel(ABC):
         """Get n largest means from model prediction."""
 
         predicted_genres_means = np.mean(prediction, axis=0)
-        largest_means_indices = np.argsort(predicted_genres_means)[-self._genres_to_take:]
+        largest_means_indices = np.argsort(predicted_genres_means)[-self._genres_to_take:][::-1]
         largest_means_values = predicted_genres_means[largest_means_indices]
 
         genres_predictions = (
