@@ -6,7 +6,7 @@ RESULTS_TOPIC = 'results_topic'
 
 CORES_TO_USE = cpu_count() // 2
 
-FMA_OR_GTZAN = 'GTZAN'
+FMA_OR_GTZAN = 'FMA'
 
 MODELS_PATH = Path(getcwd(), 'predictions', 'models')
 
