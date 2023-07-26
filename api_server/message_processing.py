@@ -20,7 +20,7 @@ logger = logging.getLogger('message_processor')
 
 @dataclass(frozen=True)
 class FileChunk:
-    '''Dataclass for storing chunks of audio files.'''
+    """Dataclass for storing chunks of audio files."""
 
     chunk_number: int
     num_of_chunks: int
@@ -30,7 +30,7 @@ class FileChunk:
 
 @dataclass(frozen=True)
 class FileData:
-    '''Dataclass for storing file data.'''
+    """Dataclass for storing file data."""
 
     file: BinaryIO
     filename: str
@@ -41,7 +41,7 @@ class FileData:
 
 
 async def get_file_data(file: UploadFile, request_id: str) -> FileData:
-    '''Create FileData object from requested file.'''
+    """Create FileData object from requested file."""
     
     file_content_type = file.content_type
     _validate_file_content_type(request_id, file_content_type)
@@ -57,7 +57,7 @@ async def get_file_data(file: UploadFile, request_id: str) -> FileData:
 
 
 async def send_file_chunks(file_data: FileData, request_id: str) -> None:
-    '''Send file chunks to predictions' server.'''
+    """Send file chunks to predictions' server."""
     
     request_sender = await get_request_sender()
     async for file_chunk in _chunkify_file(file_data.content, file_data.extension):
@@ -65,22 +65,42 @@ async def send_file_chunks(file_data: FileData, request_id: str) -> None:
         await request_sender.send_and_wait('requests_topic', message)
 
 
-def _get_file_extension(filename: str) -> str:
-    '''Get the file extension of uploaded file.'''
+async def receive_prediction_result(request_id: str) -> dict[str, str | float] | JSONResponse | None:
+    """Receive prediction result based on specified request id."""
 
-    return filename.split('.')[-1]
+    result_receiver = await get_result_receiver()
+    message: ConsumerRecord
+    async for message in result_receiver:
+        response: dict[str, str | dict[str, str | float]] = message.value
+        response_id = response['request_id']
+        if response_id == request_id:
+            return _handle_response(response)
 
 
 def _validate_file_content_type(request_id: str, file_content_type: str) -> None:
-    '''Validate file content type. Raise HTTP exception if file is not an audio file.'''
+    """Validate file content type. Raise HTTP exception if file is not an audio file."""
 
     if 'audio/' not in file_content_type:
         logger.warning(f'Invalid file_content_type: {file_content_type} for {request_id=}')
         raise HTTPException(400, detail='Please upload audio file')
 
 
+def _get_file_extension(filename: str) -> str:
+    """Get the file extension of uploaded file."""
+
+    return filename.split('.')[-1]
+
+
+def _calculate_checksum(file_data: bytes, request_id: str) -> str:
+    """Checksum on file_data."""
+
+    checksum_result = sha3_224(file_data).hexdigest()
+    logger.debug(f'checksum for {request_id=}: {checksum_result}')
+    return checksum_result
+
+
 async def _chunkify_file(file_data: bytes, file_extension: str) -> AsyncGenerator[FileChunk, None]:
-    '''Create chunks from audio file to assure they fit in kafka message and yield FileChunk.'''
+    """Create chunks from audio file to assure they fit in kafka message and yield FileChunk."""
 
     file_size = len(file_data)
     num_of_chunks = math.ceil(file_size / CHUNK_SIZE)
@@ -94,22 +114,8 @@ async def _chunkify_file(file_data: bytes, file_extension: str) -> AsyncGenerato
         yield FileChunk(chunk_number, num_of_chunks, chunk_data, file_extension)
 
 
-def _encode_file_chunk_with_base64(file_data_chunk: bytes) -> str:
-    '''Encode file chunk with base64 encoding and return decoded string.'''
-
-    return base64.b64encode(file_data_chunk).decode()
-
-
-def _calculate_checksum(file_data: bytes, request_id: str) -> str:
-    '''Checksum on file_data.'''
-
-    checksum_result = sha3_224(file_data).hexdigest()
-    logger.debug(f'checksum for {request_id=}: {checksum_result}')
-    return checksum_result
-
-
-def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file_checkum: str) -> dict[str, int | bytes | str]:
-    '''Create a message with the given file chunk to be send to the prediction server.'''
+def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file_checksum: str) -> dict[str, int | bytes | str]:
+    """Create a message with the given file chunk to be sent to the prediction server."""
     
     message = {
             MessageKey.REQUEST_ID.value: request_id,
@@ -117,22 +123,22 @@ def _create_message_with_file_chunk(request_id: str, file_chunk: FileChunk, file
             MessageKey.NUM_OF_CHUNKS.value: file_chunk.num_of_chunks,
             MessageKey.CHUNK_DATA.value: _encode_file_chunk_with_base64(file_chunk.chunk_data),
             MessageKey.FILE_EXTENSION.value: file_chunk.file_extension,
-            MessageKey.CHECKSUM.value: file_checkum
+            MessageKey.CHECKSUM.value: file_checksum
         }
     logger.info(f'created new message with file chunk for {request_id=}: chunk {file_chunk.chunk_number + 1} out of {file_chunk.num_of_chunks}')
     return message
 
 
-async def receive_prediction_result(request_id: str) -> dict[str, str | float] | JSONResponse | None:
-    '''Receive prediction result based on specified request id.'''
+def _encode_file_chunk_with_base64(file_data_chunk: bytes) -> str:
+    """Encode file chunk with base64 encoding and return decoded string."""
 
-    result_receiver = await get_result_receiver()
-    message: ConsumerRecord
-    async for message in result_receiver:
-        response: dict[str, str | float] = message.value
-        response_id = response['request_id']
-        if response_id == request_id:
-            try:
-                return response
-            except ValidationError as e:
-                return JSONResponse(content={'error': str(e)}, status_code=400)
+    return base64.b64encode(file_data_chunk).decode()
+
+
+def _handle_response(response: dict[str, str | dict[str, str | float]]) -> dict[str, str | float] | JSONResponse:
+    try:
+        if response['status'] == 'success':
+            return response['result']
+        raise HTTPException(400, detail=response['result'])
+    except ValidationError as e:
+        return JSONResponse(content={'error': str(e)}, status_code=400)

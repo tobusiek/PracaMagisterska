@@ -24,7 +24,7 @@ templates = Jinja2Templates(directory='templates')
 
 
 async def start_server() -> None:
-    '''Start FastAPI server.'''
+    """Start FastAPI server."""
 
     loop = asyncio.get_event_loop()
     config = Config(app, loop=loop, log_level='debug')
@@ -36,28 +36,28 @@ async def start_server() -> None:
 
 @app.get('/', response_class=HTMLResponse)
 async def root(request: Request) -> RedirectResponse:
-    '''Endpoint for root, redirects to /predict.'''
+    """Endpoint for root, redirects to /predict."""
 
     return RedirectResponse(url='/predict', headers=request.headers)
 
 
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon() -> FileResponse:
-    '''Endpoint for favicon.ico.'''
+    """Endpoint for favicon.ico."""
 
     return FileResponse(Path('static', 'images', 'favicon.svg'))
 
 
 @app.get('/predict', response_class=HTMLResponse)
 async def get_predict(request: Request) -> _TemplateResponse:
-    '''Endpoint for getting the form to upload file for prediction with GET.'''
+    """Endpoint for getting the form to upload file for prediction with GET."""
 
     return templates.TemplateResponse('input-file-form.html', {'request': request})
 
 
 @app.post('/predict')
 async def post_predict(request: Request, file: UploadFile = File(...)) -> _TemplateResponse:
-    '''Endpoint for uploading an audio file for prediction with POST.'''
+    """Endpoint for uploading an audio file for prediction with POST."""
     
     request_id = str(uuid.uuid4())
     file_data = await get_file_data(file, request_id)

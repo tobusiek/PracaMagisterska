@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<html lang="en">
     <head lang="en">
         <meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"/>
         <title>Prediction results</title>
@@ -6,15 +7,13 @@
         <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
     </head>
     <body>
-        <h2>Results of prediction (3 genres with highest probability):</h2>
+        <h2>Results of prediction (2 genres with the highest probability):</h2>
         <ol>
             <li>{{ first_genre }}: {{ first_genre_result }}%</li>
             <li>{{ second_genre }}: {{ second_genre_result }}%</li>
-            <li>{{ third_genre }}: {{ third_genre_result }}%</li>
         </ol>
-        <a href="/predict" name="redirect" id="redirect">  
+        <a href="/predict" name="redirect" id="redirect">
             <button type="button" id="predict-again-btn" name="predict-again-btn">Predict another song</button>  
         </a>
-        </script>
     </body>
 </html>
