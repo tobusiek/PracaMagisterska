@@ -1,5 +1,4 @@
 from dataclasses import asdict, dataclass
-from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -9,7 +8,7 @@ class FileChunkRequest:
     request_id: str
     chunk_number: int
     num_of_chunks: int
-    chunk_data: bytes
+    chunk_data: str
     file_extension: str
     checksum: str
 
@@ -26,14 +25,11 @@ class PredictionResultModel:
 
 @dataclass(frozen=True)
 class ResultResponse:
+    """Dataclass for response with result."""
+
     request_id: str
     status: str
     result: PredictionResultModel | str
 
     def make_dict(self) -> dict[str, str | float]:
         return asdict(self)
-
-
-class PredictionModel(Protocol):
-    def predict(self, request_id: str, file_data: bytes, file_extension: str) -> PredictionResultModel:
-        ...

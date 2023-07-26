@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from predictions.audio_preprocessors.base_audio_preprocessor import BaseAudioPreprocessor
+from predictions.temp_file_creator import TempFileCreator
 from tools.const_variables import GTZAN_DATASET_INFO, CORES_TO_USE
 
 logger = logging.getLogger('preprocessor')
@@ -20,6 +21,7 @@ logger = logging.getLogger('preprocessor')
 class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
     """Class for audio features preprocessing."""
 
+    _temp_file_creator = TempFileCreator(GTZAN_DATASET_INFO['audio_format'])
     _dataset_features: dict[str, dict[str, float]] = GTZAN_DATASET_INFO['features']
     _dataset_column_names: list[str] = list(_dataset_features.keys())
     _split_duration = GTZAN_DATASET_INFO['split_duration']
@@ -36,7 +38,6 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         audio_df = self._create_dataframe(audio_matrix)
         audio_df = self._minmax_audio_df(audio_df)
         audio_df = self._convert_audio_df_to_float32(audio_df)
-        self._temp_file_creator.delete_temp_file(request_id)
         return audio_df.to_numpy()
     
     def _create_audio_matrix(self, audio: np.ndarray) -> list[np.ndarray]:
@@ -73,6 +74,9 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
             features_for_row.append(mfcc_mean)
             features_for_row.append(mfcc_var)
         return features_for_row
+
+    def _trim_split(self, split: np.ndarray) -> np.ndarray:
+        return split[:self._split_duration]
 
     def _get_features_without_mfcc_and_tempo(self) -> list[Callable[[np.ndarray], np.ndarray]]:
         """Create feature functions with partially populated arguments."""

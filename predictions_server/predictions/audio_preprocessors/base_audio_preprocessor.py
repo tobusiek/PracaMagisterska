@@ -32,6 +32,7 @@ class BaseAudioPreprocessor(ABC):
         logger.info(f'preprocessing audio for {request_id=}...')
         temp_file_path = self._temp_file_creator.create_temp_file(request_id, file_data, file_extension)
         audio, sampling_rate = self._load_audio_file(temp_file_path)
+        self._temp_file_creator.delete_temp_file(request_id)
         if not sampling_rate:
             logger.error(f'corrupted audio file for {request_id=}')
             raise RuntimeError(f'corrupted audio file for {request_id=}')

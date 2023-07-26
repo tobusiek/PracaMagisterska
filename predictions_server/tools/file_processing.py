@@ -3,6 +3,7 @@ from hashlib import sha3_224
 import logging
 
 from data_models import FileChunkRequest
+from tools.const_variables import TEMP_FILES_PATH
 
 logger = logging.getLogger('predictions')
 
@@ -39,9 +40,19 @@ def fill_buffer(request_id: str, file_chunk_request: FileChunkRequest) -> None:
 
 
 def remove_request_from_buffer(request_id: str) -> None:
+    """Remove request's file chunks from buffer."""
+
     if request_id not in REQUESTS_BUFFER:
         return
     REQUESTS_BUFFER.pop(request_id, None)
+
+
+def remove_files_after_error() -> None:
+    for dir_element in TEMP_FILES_PATH.iterdir():
+        if dir_element.is_dir():
+            continue
+        dir_element.unlink()
+
 
 def _decode_file_chunk_with_base64(file_chunk: str) -> bytes:
     """Decode file chunk received from producer (str) with base64 encoding."""

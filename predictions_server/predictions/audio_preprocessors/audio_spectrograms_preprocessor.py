@@ -30,7 +30,6 @@ class AudioSpectrogramsPreprocessor(BaseAudioPreprocessor):
         """Create temporary file from bytes, load it with librosa, trim it, make spectrograms and delete temporary file."""
 
         audio = self._get_audio(request_id, file_data, file_extension)
-        self._temp_file_creator.delete_temp_file(request_id)
         return self._generate_track_melspectrograms(audio)
 
     def _generate_track_melspectrograms(self, audio: np.ndarray) -> np.ndarray | None:

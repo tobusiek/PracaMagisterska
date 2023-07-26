@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from pydub import AudioSegment
+from pydub.exceptions import CouldntDecodeError
 
 from tools.const_variables import TEMP_FILES_PATH
 
@@ -52,7 +53,11 @@ class TempFileCreator:
         
         temp_filename_dataset_audio_format = request_id + self._dataset_audio_format
         proper_format_audio_path = self._temp_files_path / temp_filename_dataset_audio_format
-        audio_segment: AudioSegment = AudioSegment.from_file(temp_file_path)
-        audio_segment.export(proper_format_audio_path, format=self._dataset_audio_format.replace('.', ''))
-        logger.info(f"created temporary file with dataset's audio format for {request_id=}")
-        return proper_format_audio_path
+        try:
+            audio_segment: AudioSegment = AudioSegment.from_file(temp_file_path)
+        except CouldntDecodeError:
+            raise RuntimeError(f'{request_id=} file corrupted, cannot be exported with different format')
+        else:
+            audio_segment.export(proper_format_audio_path, format=self._dataset_audio_format.replace('.', ''))
+            logger.info(f"created temporary file with dataset's audio format for {request_id=}")
+            return proper_format_audio_path
