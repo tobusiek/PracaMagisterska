@@ -9,7 +9,7 @@ from consumer_setup import initialize_kafka, stop_kafka, get_request_receiver, g
 from data_models import PredictionResultModel, FileChunkRequest, PredictionModel, ResultResponse
 from predictions.models.prediction_features_model import PredictionFeaturesModel
 from predictions.models.prediction_spectrograms_model import PredictionSpectrogramsModel
-from tools.const_variables import FMA_OR_GTZAN
+from tools.const_variables import FMA_OR_GTZAN, RESULTS_TOPIC
 from tools.file_processing import create_file_from_chunks, fill_buffer, remove_request_from_buffer
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
@@ -25,9 +25,21 @@ def _create_prediction_result_message(request_id: str, prediction_result: Predic
 
 
 async def _handle_checksum_mismatch_error(request_id: str) -> None:
+    """Send error result - checksum mismatch after concatenating chunks."""
+
     result_response = ResultResponse(request_id, 'fail', 'File checksum mismatch after sending for prediction.')
     result_sender = await get_result_sender()
-    await result_sender.send_and_wait('results_topic', result_response.make_dict())
+    await result_sender.send_and_wait(RESULTS_TOPIC, result_response.make_dict())
+    logger.warning(f'{request_id=} checksum mismatch after concatenating chunks')
+
+
+async def _handle_file_corrupted_error(request_id: str) -> None:
+    """Send error result - file cannot be loaded by librosa."""
+
+    result_response = ResultResponse(request_id, 'fail', 'File corrupted, cannot make a prediction.')
+    result_sender = await get_result_sender()
+    await result_sender.send_and_wait(RESULTS_TOPIC, result_response.make_dict())
+    logger.warning(f'{request_id=} cannot be loaded by librosa')
 
 
 async def _send_prediction_result(request_id: str, prediction_result: PredictionResultModel) -> None:
@@ -35,15 +47,30 @@ async def _send_prediction_result(request_id: str, prediction_result: Prediction
     
     response = _create_prediction_result_message(request_id, prediction_result)
     result_sender = await get_result_sender()
-    await result_sender.send_and_wait('results_topic', response)
+    await result_sender.send_and_wait(RESULTS_TOPIC, response)
     logger.info(f'result sent to producer: {response}')
+
+
+async def _send_failed_prediction_response(request_id: str) -> None:
+    """"""
+
+    response = ResultResponse(request_id, 'fail', 'File could not be preprocessed to make prediction.')
+    result_sender = await get_result_sender()
+    await result_sender.send_and_wait(RESULTS_TOPIC, response)
+    logger.warning(f'{request_id=} could not be preprocessed')
 
 
 async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: PredictionModel, file_extension: str) -> None:
     """Perform prediction on received file and send the results back to producer."""
-    
-    prediction_result = model.predict(request_id, file_data, file_extension)
-    await _send_prediction_result(request_id, prediction_result)
+
+    try:
+        prediction_result = model.predict(request_id, file_data, file_extension)
+    except RuntimeError:
+        await _handle_file_corrupted_error(request_id)
+    else:
+        if prediction_result:
+            await _send_prediction_result(request_id, prediction_result)
+            return
 
 
 async def process_messages(message: ConsumerRecord, model: PredictionModel) -> None:
@@ -56,9 +83,8 @@ async def process_messages(message: ConsumerRecord, model: PredictionModel) -> N
     fill_buffer(request_id, file_chunk_request)
     try:
         file_data = create_file_from_chunks(request_id, file_chunk_request.checksum)
-    except BytesWarning as e:
-        logger.error(e)
-        # TODO: send back message with checksum mismatch error
+    except BytesWarning:
+        await _handle_checksum_mismatch_error(request_id)
     else:
         if file_data:
             remove_request_from_buffer(request_id)

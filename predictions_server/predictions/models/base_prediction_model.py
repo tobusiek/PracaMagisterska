@@ -2,7 +2,6 @@ from abc import ABC
 from collections import namedtuple
 from heapq import nlargest
 import logging
-from pathlib import Path
 
 from keras.models import Model
 import numpy as np
@@ -24,16 +23,18 @@ class BasePredictionModel(ABC):
         self._labels = labels
         self._genres_to_take = 2
 
-    def predict(self, request_id: str, file_data: bytes, file_extension: str) -> PredictionResultModel:
+    def predict(self, request_id: str, file_data: bytes, file_extension: str) -> PredictionResultModel | None:
         """Make a prediction on audio file."""
 
         logger.debug(f'making prediction for {request_id=}...')
         processed_audio = self._audio_preprocessor.preprocess_audio(request_id, file_data, file_extension)
+        if not processed_audio:
+            return None
         prediction = self._model.predict(processed_audio)
         return self._create_prediction_result_model(request_id, prediction)
 
     def _create_prediction_result_model(self, request_id: str, prediction: np.ndarray[np.ndarray[np.float32]]) -> PredictionResultModel:
-        '''Create a model prediction result for n largest means from model prediction.'''
+        """Create a model prediction result for n-largest means from model prediction."""
 
         n_predictions_with_largest_means = self._get_n_predictions_with_largest_means(prediction)
         first_highest_result, second_highest_result = n_predictions_with_largest_means
@@ -47,7 +48,7 @@ class BasePredictionModel(ABC):
 
     # def _get_n_predictions_with_largest_means(self, prediction: np.ndarray[np.ndarray[np.float32]]) -> tuple[
     #     GenresPrediction, ...]:
-    #     '''Get n largest means from model prediction.'''
+    #     """Get n largest means from model prediction."""
     #
     #     predicted_genres_means = [np.mean(prediction_for_genre) for prediction_for_genre in prediction.T]
     #     largest_means_of_predicted_genres = nlargest(self._genres_to_take, predicted_genres_means)
@@ -57,10 +58,10 @@ class BasePredictionModel(ABC):
     #                  for idx, nth_largest_mean in zip(indices_of_n_largest_means, largest_means_of_predicted_genres))
 
     def _get_n_predictions_with_largest_means(self, prediction: np.ndarray) -> tuple:
-        '''Get n largest means from model prediction.'''
+        """Get n largest means from model prediction."""
 
         predicted_genres_means = np.mean(prediction, axis=0)
-        largest_means_indices = np.argsort(predicted_genres_means)[::-1][-self._genres_to_take:]
+        largest_means_indices = np.argsort(predicted_genres_means)[-self._genres_to_take:]
         largest_means_values = predicted_genres_means[largest_means_indices]
 
         genres_predictions = (

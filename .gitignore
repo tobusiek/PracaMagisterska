@@ -144,8 +144,7 @@ predictions_server/model_testing/data/FMA/fma_medium
 predictions_server/model_testing/data/FMA/fma_small
 predictions_server/model_testing/data/FMA/fma_metadata
 predictions_server/model_testing/data/FMA/pickled_spectrograms
-predictions_server/model_testing/data/FMA/models/model*
-predictions_server/model_testing/data/FMA/models/temp_files
+predictions_server/model_testing/data/FMA/models
 predictions_server/model_testing/data/FMA/models_backup.zip
 
 predictions_server/model_testing/data/GTZAN/genres_original
@@ -153,8 +152,8 @@ predictions_server/model_testing/data/GTZAN/images_original
 predictions_server/model_testing/data/GTZAN/features_3_sec.csv
 predictions_server/model_testing/data/GTZAN/features_30_sec.csv
 
-predictions_server/model_testing/temp_files
 predictions_server/model_testing/test_audio.*
+predictions_server/temp_files
 
 requirements-froze.txt
 requirements.txt.bak

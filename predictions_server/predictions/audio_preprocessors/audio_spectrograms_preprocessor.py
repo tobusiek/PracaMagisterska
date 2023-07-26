@@ -1,25 +1,25 @@
 import logging
 import multiprocessing as mp
-from pathlib import Path
 import warnings
+
+from predictions.audio_preprocessors.base_audio_preprocessor import BaseAudioPreprocessor
+from predictions.temp_file_creator import TempFileCreator
+
 warnings.filterwarnings("ignore", category=UserWarning, module="librosa")
 warnings.filterwarnings("ignore", category=FutureWarning, module="librosa")
 
-from audioread.exceptions import NoBackendError
 import librosa
 import numpy as np
-import soundfile as sf
 
-from predictions.temp_file_creator import TempFileCreator
 from tools.const_variables import FMA_DATASET_INFO, CORES_TO_USE
 
 logger = logging.getLogger('preprocessor')
 
 
-class AudioSpectrogramsPreprocessor:
+class AudioSpectrogramsPreprocessor(BaseAudioPreprocessor):
     """Class for audio spectrograms preprocessing."""
 
-    _temp_file_creator = TempFileCreator()
+    _temp_file_creator = TempFileCreator(FMA_DATASET_INFO['audio_format'])
     _split_duration: float = FMA_DATASET_INFO['split_duration']
     _sampling_rate: int = FMA_DATASET_INFO['sampling_rate']
     _n_fft: int = FMA_DATASET_INFO['n_fft']
@@ -29,20 +29,9 @@ class AudioSpectrogramsPreprocessor:
     def preprocess_audio(self, request_id: str, file_data: bytes, file_extension: str) -> np.ndarray:
         """Create temporary file from bytes, load it with librosa, trim it, make spectrograms and delete temporary file."""
 
-        logger.info(f'preprocessing audio for {request_id=}...')
-        temp_file_path = self._temp_file_creator.create_temp_file(
-            request_id, file_data, file_extension)
-        audio, sr = self._load_audio_file(temp_file_path)
-        if not isinstance(audio, np.ndarray):
-            logger.error(f'corrupted audio file for {request_id=}')
-            raise BytesWarning('corrupted audio file')
+        audio = self._get_audio(request_id, file_data, file_extension)
+        self._temp_file_creator.delete_temp_file(request_id)
         return self._generate_track_melspectrograms(audio)
-    
-    def _load_audio_file(self, file_path: Path) -> tuple[np.ndarray, float] | tuple[None, None]:
-        try:
-            return librosa.load(file_path, sr=self._sampling_rate, mono=True)
-        except (FileNotFoundError, sf.LibsndfileError, NoBackendError):
-            return None, None
 
     def _generate_track_melspectrograms(self, audio: np.ndarray) -> np.ndarray | None:
         track_melspectrograms = []

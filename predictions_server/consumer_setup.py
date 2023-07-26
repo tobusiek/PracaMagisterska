@@ -11,7 +11,7 @@ _result_sender: AIOKafkaProducer = None
 
 
 async def _create_request_receiver() -> AIOKafkaConsumer:
-    '''Create AIOKafkaConsumer for receiving requests from producer.'''
+    """Create AIOKafkaConsumer for receiving requests from producer."""
 
     logger.debug('creating request_receiver...')
     return AIOKafkaConsumer(
@@ -28,7 +28,7 @@ async def _create_request_receiver() -> AIOKafkaConsumer:
 
 
 async def _create_result_sender() -> AIOKafkaProducer:
-    '''Create AIOKafkaProducer for sending prediction results to producer.'''
+    """Create AIOKafkaProducer for sending prediction results to producer."""
 
     logger.debug('creating result_sender...')
     return AIOKafkaProducer(
@@ -38,7 +38,7 @@ async def _create_result_sender() -> AIOKafkaProducer:
 
 
 async def get_request_receiver() -> AIOKafkaConsumer:
-    '''Get request_receiver (AIOKafkaConsumer), create if not instantiated.'''
+    """Get request_receiver (AIOKafkaConsumer), create if not instantiated."""
 
     global _request_receiver
     if _request_receiver is None:
@@ -48,7 +48,7 @@ async def get_request_receiver() -> AIOKafkaConsumer:
 
 
 async def get_result_sender() -> AIOKafkaProducer:
-    '''Get result_sender (AIOKafkaProducer), create if not instantiated.'''
+    """Get result_sender (AIOKafkaProducer), create if not instantiated."""
 
     global _result_sender
     if _result_sender is None:
@@ -58,7 +58,7 @@ async def get_result_sender() -> AIOKafkaProducer:
 
 
 async def _start_result_sender() -> None:
-    '''Start result_sender (AIOKafkaProducer).'''
+    """Start result_sender (AIOKafkaProducer)."""
 
     logger.debug('starting result_sender...')
     await _result_sender.start()
@@ -66,7 +66,7 @@ async def _start_result_sender() -> None:
 
 
 async def _start_request_receiver() -> None:
-    '''Start request_receiver (AIOKafkaConsumer).'''
+    """Start request_receiver (AIOKafkaConsumer)."""
     
     logger.debug('starting request_receiver...')
     await _request_receiver.start()
@@ -74,7 +74,7 @@ async def _start_request_receiver() -> None:
     
 
 async def _start_kafka() -> None:
-    '''Start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
+    """Start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer)."""
     
     logger.debug('starting kafka...')
     await asyncio.gather(
@@ -85,7 +85,7 @@ async def _start_kafka() -> None:
 
 
 async def initialize_kafka() -> None:
-    '''Create and start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
+    """Create and start both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer)."""
     
     global _result_sender, _request_receiver
     logger.debug('initializing kafka...')
@@ -98,21 +98,21 @@ async def initialize_kafka() -> None:
 
 
 async def _stop_result_sender() -> None:
-    '''Stop result_sender (AIOKafkaProducer).'''
+    """Stop result_sender (AIOKafkaProducer)."""
 
     logger.debug('stopping result_sender...')
     await _result_sender.stop()
 
 
 async def _stop_request_receiver() -> None:
-    '''Stop request_receiver (AIOKafkaConsumer).'''
+    """Stop request_receiver (AIOKafkaConsumer)."""
     
     logger.debug('stopping request_receiver...')
     await _request_receiver.stop()
 
 
 async def stop_kafka() -> None:
-    '''Stop both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer).'''
+    """Stop both result_sender (AIOKafkaProducer) and request_receiver (AIOKafkaConsumer)."""
     
     logger.debug('stopping kafka...')
     await asyncio.gather(

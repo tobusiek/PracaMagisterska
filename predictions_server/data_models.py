@@ -4,7 +4,7 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class FileChunkRequest:
-    '''Dataclass for request with file chunk.'''
+    """Dataclass for request with file chunk."""
 
     request_id: str
     chunk_number: int
@@ -16,7 +16,7 @@ class FileChunkRequest:
 
 @dataclass(frozen=True)
 class PredictionResultModel:
-    '''Dataclass for model's prediction result.'''
+    """Dataclass for model's prediction result."""
 
     first_genre: str
     first_genre_result: float
