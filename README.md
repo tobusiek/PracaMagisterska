@@ -22,7 +22,7 @@ $ python3.10 -m pip install virtualenv
 $ python3.10 -m venv <your_venv_name>
 ```
 
-*If it doesn't work try:*
+*If this doesn't work - try:*
 ```console
 $ sudo apt install python3-pip
 $ sudo apt install python3-venv

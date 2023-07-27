@@ -154,6 +154,3 @@ predictions_server/model_testing/data/GTZAN/features_30_sec.csv
 
 predictions_server/model_testing/test_audio.*
 predictions_server/temp_files
-
-requirements-froze.txt
-requirements.txt.bak
