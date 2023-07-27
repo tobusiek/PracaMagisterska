@@ -7,10 +7,12 @@ from aiokafka.structs import ConsumerRecord
 
 from consumer_setup import initialize_kafka, stop_kafka, get_request_receiver, get_result_sender
 from data_models import PredictionResultModel, FileChunkRequest, ResultResponse
+from predictions.audio_preprocessors.audio_exceptions import CorruptedAudioFileException, AudioTooLongException, \
+    AudioTooShortException
 from predictions.models.base_prediction_model import BasePredictionModel
 from predictions.models.prediction_features_model import PredictionFeaturesModel
 from predictions.models.prediction_spectrograms_model import PredictionSpectrogramsModel
-from tools.const_variables import FMA_OR_GTZAN, RESULTS_TOPIC
+from tools.const_variables import FMA_OR_GTZAN, RESULTS_TOPIC, MIN_AUDIO_DURATION, MAX_AUDIO_DURATION
 from tools.file_processing import create_file_from_chunks, fill_buffer, remove_files_after_error, remove_request_from_buffer
 
 logging.config.fileConfig(Path('resources', 'logging.ini'), disable_existing_loggers=False)
@@ -44,6 +46,24 @@ async def _handle_file_corrupted_error(request_id: str) -> None:
     remove_files_after_error()
 
 
+async def _handle_audio_too_short_error(request_id: str) -> None:
+    """Send error result - audio too short."""
+
+    result_response = ResultResponse(request_id, 'fail', f'Audio too short, min audio duration = {MIN_AUDIO_DURATION} seconds')
+    result_sender = await get_result_sender()
+    await result_sender.send_and_wait(RESULTS_TOPIC, result_response.make_dict())
+    remove_files_after_error()
+
+
+async def _handle_audio_too_long_error(request_id: str) -> None:
+    """Send error result - audio too long."""
+
+    result_response = ResultResponse(request_id, 'fail', f'Audio too long, min audio duration = {MAX_AUDIO_DURATION} seconds')
+    result_sender = await get_result_sender()
+    await result_sender.send_and_wait(RESULTS_TOPIC, result_response.make_dict())
+    remove_files_after_error()
+
+
 async def _send_prediction_result(request_id: str, prediction_result: PredictionResultModel) -> None:
     """Send prediction result to server."""
     
@@ -67,7 +87,11 @@ async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: 
 
     try:
         prediction_result = model.predict(request_id, file_data, file_extension)
-    except RuntimeError:
+    except AudioTooLongException:
+        await _handle_audio_too_long_error(request_id)
+    except AudioTooShortException:
+        await _handle_audio_too_short_error(request_id)
+    except CorruptedAudioFileException:
         await _handle_file_corrupted_error(request_id)
     else:
         if prediction_result:

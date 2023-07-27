@@ -11,9 +11,10 @@ from librosa.feature import (
 import numpy as np
 import pandas as pd
 
+from predictions.audio_preprocessors.audio_exceptions import AudioTooShortException, AudioTooLongException
 from predictions.audio_preprocessors.base_audio_preprocessor import BaseAudioPreprocessor
 from predictions.temp_file_creator import TempFileCreator
-from tools.const_variables import GTZAN_DATASET_INFO, CORES_TO_USE
+from tools.const_variables import GTZAN_DATASET_INFO, CORES_TO_USE, MAX_AUDIO_DURATION
 
 logger = logging.getLogger('preprocessor')
 
@@ -33,12 +34,24 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         """Create temporary file from bytes, load it with librosa, trim it, make a dataframe, minmax features and delete temporary file."""
 
         audio = self._get_audio(request_id, file_data, file_extension)
+        self._validate_audio_duration(request_id, audio)
         audio = self._trim_audio(audio)
         audio_matrix = self._create_audio_matrix(audio)
         audio_df = self._create_dataframe(audio_matrix)
         audio_df = self._minmax_audio_df(audio_df)
         audio_df = self._convert_audio_df_to_float32(audio_df)
         return audio_df.to_numpy()
+
+    def _validate_audio_duration(self, request_id: str, audio: np.ndarray) -> None:
+        """Validate if audio duration fits between split duration and max audio duration."""
+
+        duration = self._get_audio_duration(audio)
+        if duration < self._split_duration // self._sampling_rate:
+            logger.warning(f'{request_id=} audio too short')
+            raise AudioTooShortException(f'{request_id=} audio duration to short')
+        if duration > MAX_AUDIO_DURATION:
+            logger.warning(f'{request_id=} audio too long')
+            raise AudioTooLongException(f'{request_id=} audio duration to long')
     
     def _create_audio_matrix(self, audio: np.ndarray) -> list[np.ndarray]:
         """Create matrix for audio, splitting it to fit length of dataset records."""

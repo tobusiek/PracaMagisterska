@@ -3,11 +3,12 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from audioread.exceptions import NoBackendError
-from librosa import load
+from librosa import load, get_duration
 from librosa.effects import trim
 import numpy as np
 import soundfile as sf
 
+from predictions.audio_preprocessors.audio_exceptions import CorruptedAudioFileException
 from predictions.temp_file_creator import TempFileCreator
 
 logger = logging.getLogger('preprocessor')
@@ -35,7 +36,8 @@ class BaseAudioPreprocessor(ABC):
         self._temp_file_creator.delete_temp_file(request_id)
         if not sampling_rate:
             logger.error(f'corrupted audio file for {request_id=}')
-            raise RuntimeError(f'corrupted audio file for {request_id=}')
+            raise CorruptedAudioFileException(f'corrupted audio file for {request_id=}')
+        self._validate_audio_duration(request_id, audio)
         return audio
 
     def _load_audio_file(self, file_path: Path) -> tuple[np.ndarray, float] | tuple[None, None]:
@@ -51,6 +53,20 @@ class BaseAudioPreprocessor(ABC):
         """Trim audio to get rid of silent parts."""
 
         return trim(audio)[0]
+
+    def _get_audio_duration(self, audio: np.ndarray) -> float:
+        """Get duration of audio in seconds."""
+
+        return get_duration(
+            y=audio,
+            sr=self._sampling_rate,
+            n_fft=self._n_fft,
+            hop_length=self._hop_length
+        )
+
+    @abstractmethod
+    def _validate_audio_duration(self, request_id: str, audio: np.ndarray) -> None:
+        raise NotImplemented("Called _validate_audio_duration on an abstract class")
 
     @abstractmethod
     def _split_audio(self, audio: np.ndarray) -> list[np.ndarray]:
