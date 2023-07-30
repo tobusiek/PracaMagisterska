@@ -56,6 +56,14 @@
             "min": 9.312308610806998e-23,
             "max": 0.1270515024662017
         },
+        "perceptr_mean": {
+            "min": -0.0087939305230975,
+            "max": 0.0068187820725142
+        },
+        "perceptr_var": {
+            "min": 4.672044795483998e-08,
+            "max": 0.0588790923357009
+        },
         "tempo": {
             "min": 24.37721108490566,
             "max": 287.109375
@@ -235,7 +243,7 @@
     ],
     "split_duration": 66149,
     "sampling_rate": 22050,
+    "audio_format": ".mp3",
     "n_fft": 2048,
-    "hop_length": 512,
-    "audio_format": ".au"
+    "hop_length": 512
 }

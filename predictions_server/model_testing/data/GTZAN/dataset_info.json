@@ -56,6 +56,14 @@
             "min": 9.312308610806998e-23,
             "max": 0.1270515024662017
         },
+        "perceptr_mean": {
+            "min": -0.0087939305230975,
+            "max": 0.0068187820725142
+        },
+        "perceptr_var": {
+            "min": 4.672044795483998e-08,
+            "max": 0.0588790923357009
+        },
         "tempo": {
             "min": 24.37721108490566,
             "max": 287.109375
@@ -222,16 +230,16 @@
         }
     },
     "length_of_records": 66149,
-    "labels": {
-        "blues": 0,
-        "classical": 1,
-        "country": 2,
-        "disco": 3,
-        "hiphop": 4,
-        "jazz": 5,
-        "metal": 6,
-        "pop": 7,
-        "reggae": 8,
-        "rock": 9
-    }
+    "labels": [
+        "blues",
+        "classical",
+        "country",
+        "disco",
+        "hiphop",
+        "jazz",
+        "metal",
+        "pop",
+        "reggae",
+        "rock"
+    ]
 }
