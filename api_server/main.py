@@ -64,7 +64,7 @@ async def post_predict(request: Request, file: UploadFile = File(...)) -> _Templ
     logger.debug(f'received file: {file_data.filename} for {request_id=}')
     await send_file_chunks(file_data, request_id)
     results = await receive_prediction_result(request_id)
-    logger.info(f'received results: {results}')
+    logger.info(f'{request_id=} received results: {results}')
     context = {'request': request, **results}
     return templates.TemplateResponse('results.html', context)
 

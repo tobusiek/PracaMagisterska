@@ -1,12 +1,12 @@
-from functools import partial
 import logging
 import multiprocessing as mp
-from typing import Callable
 
-from librosa.effects import harmonic
+from librosa import zero_crossings
+from librosa.beat import beat_track
+from librosa.effects import hpss
 from librosa.feature import (
     chroma_stft, rms, spectral_centroid, spectral_bandwidth,
-    spectral_rolloff, zero_crossing_rate, tempo, mfcc
+    spectral_rolloff, mfcc
 )
 import numpy as np
 import pandas as pd
@@ -17,6 +17,8 @@ from predictions.temp_file_creator import TempFileCreator
 from tools.const_variables import GTZAN_DATASET_INFO, CORES_TO_USE, MAX_AUDIO_DURATION
 
 logger = logging.getLogger('preprocessor')
+
+FeatureMeanAndVar = tuple[float, float]
 
 
 class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
@@ -61,7 +63,8 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         audio_splits = self._split_audio(audio)
         with mp.Pool(CORES_TO_USE) as pool:
             for split in audio_splits:
-                audio_matrix.append(pool.apply(self._get_features_for_split, args=(split,)))
+                trimmed_split = self._trim_split(split)
+                audio_matrix.append(pool.apply(self._get_features_for_split, args=(trimmed_split,)))
             logger.debug('audio matrix created')
             return audio_matrix
 
@@ -71,47 +74,71 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         n_splits = len(audio) // self._split_duration
         logger.debug(f'audio splitted to {n_splits} splits')
         return np.array_split(audio, n_splits)
+    
+    def _trim_split(self, split: np.ndarray) -> np.ndarray:
+        """Trim the split to fit lenght of splits in dataset."""
+
+        return split[:self._split_duration]
 
     def _get_features_for_split(self, split: np.ndarray) -> list[float]:
         """Get features for split that were used in dataset."""
 
-        trimmed_split = self._trim_split(split)
         features_for_row = []
-        for feature in self._get_features_without_mfcc_and_tempo():
-            feature_mean, feature_var = self._get_mean_and_var(feature(y=trimmed_split))
-            features_for_row.append(feature_mean)
-            features_for_row.append(feature_var)
-        features_for_row.append(tempo(y=trimmed_split, hop_length=self._hop_length))
-        for mfcc_ in mfcc(y=trimmed_split, sr=self._sampling_rate):
-            mfcc_mean, mfcc_var = self._get_mean_and_var(mfcc_)
-            features_for_row.append(mfcc_mean)
-            features_for_row.append(mfcc_var)
+        features_for_row.extend(self._get_chroma_stft_features(split))
+        features_for_row.extend(self._get_rms_features(split))
+        features_for_row.extend(self._get_spectral_centroid_features(split))
+        features_for_row.extend(self._get_spectral_bandwidth_features(split))
+        features_for_row.extend(self._get_rolloff_features(split))
+        features_for_row.extend(self._get_zcr_features(split))
+        harmony_features, perceptr_features = self._get_harmony_and_perceptr_features(split)
+        features_for_row.extend(harmony_features)
+        features_for_row.extend(perceptr_features)
+        features_for_row.append(self._get_tempo_feature(split))
+        features_for_row.extend(self._get_mfcc_features(split))
         return features_for_row
-
-    def _trim_split(self, split: np.ndarray) -> np.ndarray:
-        return split[:self._split_duration]
-
-    def _get_features_without_mfcc_and_tempo(self) -> list[Callable[[np.ndarray], np.ndarray]]:
-        """Create feature functions with partially populated arguments."""
-
-        sampling_rate = self._sampling_rate
-        n_fft = self._n_fft
-        hop_length = self._hop_length
-        return [
-            partial(chroma_stft, sr=sampling_rate, n_fft=n_fft, hop_length=hop_length),
-            partial(rms, hop_length=hop_length),
-            partial(spectral_centroid, sr=sampling_rate, n_fft=n_fft, hop_length=hop_length),
-            partial(spectral_bandwidth, sr=sampling_rate, n_fft=n_fft, hop_length=hop_length),
-            partial(spectral_rolloff, sr=sampling_rate, n_fft=n_fft, hop_length=hop_length),
-            partial(zero_crossing_rate, frame_length=n_fft, hop_length=hop_length),
-            harmonic
-        ]
-
+    
     @staticmethod
-    def _get_mean_and_var(feature: np.ndarray) -> tuple[float, float]:
+    def _get_mean_and_var(feature: np.ndarray) -> FeatureMeanAndVar:
         """Get mean and var from feature."""
 
         return np.mean(feature), np.var(feature)
+    
+    def _get_chroma_stft_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        chroma_stft_ = chroma_stft(y=split, sr=self._sampling_rate, hop_length=self._hop_length)
+        return self._get_mean_and_var(chroma_stft_)
+    
+    def _get_rms_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        rms_ = rms(y=split)
+        return self._get_mean_and_var(rms_)
+    
+    def _get_spectral_centroid_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        spectral_centroid_ = spectral_centroid(y=split, sr=self._sampling_rate)[0]
+        return self._get_mean_and_var(spectral_centroid_)
+    
+    def _get_spectral_bandwidth_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        spectral_bandwidth_ = spectral_bandwidth(y=split, sr=self._sampling_rate)
+        return self._get_mean_and_var(spectral_bandwidth_)
+    
+    def _get_rolloff_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        rolloff_ = spectral_rolloff(y=split, sr=self._sampling_rate)[0]
+        return self._get_mean_and_var(rolloff_)
+    
+    def _get_zcr_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        zcr = zero_crossings(y=split, pad=False)
+        return self._get_mean_and_var(zcr)
+    
+    def _get_harmony_and_perceptr_features(self, split: np.ndarray) -> tuple[FeatureMeanAndVar, FeatureMeanAndVar]:
+        harmony, perceptr = hpss(y=split)
+        return self._get_mean_and_var(harmony), self._get_mean_and_var(perceptr)
+    
+    def _get_tempo_feature(self, split: np.ndarray) -> float:
+        return beat_track(y=split, sr=self._sampling_rate)[0]
+    
+    def _get_mfcc_features(self, split: np.ndarray) -> list[FeatureMeanAndVar]:
+        mfccs = []
+        for mfcc_ in mfcc(y=split, sr=self._sampling_rate):
+            mfccs.extend(self._get_mean_and_var(mfcc_))
+        return mfccs
     
     def _create_dataframe(self, audio_matrix: list[np.ndarray]) -> pd.DataFrame:
         """Create dataframe for audio from matrix."""

@@ -243,7 +243,7 @@
     ],
     "split_duration": 66149,
     "sampling_rate": 22050,
-    "audio_format": ".mp3",
+    "audio_format": ".wav",
     "n_fft": 2048,
     "hop_length": 512
 }
