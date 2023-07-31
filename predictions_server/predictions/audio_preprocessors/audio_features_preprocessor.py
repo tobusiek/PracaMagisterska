@@ -1,12 +1,11 @@
 import logging
 import multiprocessing as mp
 
-from librosa import zero_crossings
 from librosa.beat import beat_track
 from librosa.effects import hpss
 from librosa.feature import (
     chroma_stft, rms, spectral_centroid, spectral_bandwidth,
-    spectral_rolloff, mfcc
+    spectral_rolloff, mfcc, zero_crossing_rate
 )
 import numpy as np
 import pandas as pd
@@ -76,7 +75,7 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         return np.array_split(audio, n_splits)
     
     def _trim_split(self, split: np.ndarray) -> np.ndarray:
-        """Trim the split to fit lenght of splits in dataset."""
+        """Trim the split to fit length of splits in dataset."""
 
         return split[:self._split_duration]
 
@@ -124,7 +123,7 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         return self._get_mean_and_var(rolloff_)
     
     def _get_zcr_features(self, split: np.ndarray) -> FeatureMeanAndVar:
-        zcr = zero_crossings(y=split, pad=False)
+        zcr = zero_crossing_rate(y=split)
         return self._get_mean_and_var(zcr)
     
     def _get_harmony_and_perceptr_features(self, split: np.ndarray) -> tuple[FeatureMeanAndVar, FeatureMeanAndVar]:
