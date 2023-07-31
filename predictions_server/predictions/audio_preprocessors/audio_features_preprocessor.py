@@ -103,37 +103,55 @@ class AudioFeaturesPreprocessor(BaseAudioPreprocessor):
         return np.mean(feature), np.var(feature)
     
     def _get_chroma_stft_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        """Calculate chromamagram STFT feature for split."""
+
         chroma_stft_ = chroma_stft(y=split, sr=self._sampling_rate, hop_length=self._hop_length)
         return self._get_mean_and_var(chroma_stft_)
     
     def _get_rms_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        """Calculate rms feature for split."""
+
         rms_ = rms(y=split)
         return self._get_mean_and_var(rms_)
     
     def _get_spectral_centroid_features(self, split: np.ndarray) -> FeatureMeanAndVar:
-        spectral_centroid_ = spectral_centroid(y=split, sr=self._sampling_rate)[0]
+        """Calculate spectral centroid feature for split."""
+
+        spectral_centroid_ = spectral_centroid(y=split, sr=self._sampling_rate)
         return self._get_mean_and_var(spectral_centroid_)
     
     def _get_spectral_bandwidth_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        """Calculate spectral bandwidth feature for split."""
+
         spectral_bandwidth_ = spectral_bandwidth(y=split, sr=self._sampling_rate)
         return self._get_mean_and_var(spectral_bandwidth_)
     
     def _get_rolloff_features(self, split: np.ndarray) -> FeatureMeanAndVar:
-        rolloff_ = spectral_rolloff(y=split, sr=self._sampling_rate)[0]
+        """Calculate spectral roll-off feature for split."""
+
+        rolloff_ = spectral_rolloff(y=split, sr=self._sampling_rate)
         return self._get_mean_and_var(rolloff_)
     
     def _get_zcr_features(self, split: np.ndarray) -> FeatureMeanAndVar:
+        """Calculate zero crossing rate feature for split."""
+
         zcr = zero_crossing_rate(y=split)
         return self._get_mean_and_var(zcr)
     
     def _get_harmony_and_perceptr_features(self, split: np.ndarray) -> tuple[FeatureMeanAndVar, FeatureMeanAndVar]:
+        """Calculate harmony and perceptr features for split."""
+
         harmony, perceptr = hpss(y=split)
         return self._get_mean_and_var(harmony), self._get_mean_and_var(perceptr)
     
     def _get_tempo_feature(self, split: np.ndarray) -> float:
+        """Calculate tempo for split."""
+
         return beat_track(y=split, sr=self._sampling_rate)[0]
     
     def _get_mfcc_features(self, split: np.ndarray) -> list[FeatureMeanAndVar]:
+        """Calculate mfcc features for split."""
+        
         mfccs = []
         for mfcc_ in mfcc(y=split, sr=self._sampling_rate):
             mfccs.extend(self._get_mean_and_var(mfcc_))
