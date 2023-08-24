@@ -65,7 +65,7 @@ async def _handle_audio_too_long_error(request_id: str) -> None:
 
 
 async def _send_prediction_result(request_id: str, prediction_result: PredictionResultModel) -> None:
-    """Send prediction result to server."""
+    """Send prediction result to API server."""
     
     result_response = _create_prediction_result_message(request_id, prediction_result)
     result_sender = await get_result_sender()
@@ -83,7 +83,7 @@ async def _send_failed_prediction_response(request_id: str) -> None:
 
 
 async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: BasePredictionModel, file_extension: str) -> None:
-    """Perform prediction on received file and send the results back to producer."""
+    """Perform prediction on received file and send the results back to API server."""
 
     try:
         prediction_result = model.predict(request_id, file_data, file_extension)
@@ -102,7 +102,7 @@ async def _perform_prediction_on_file(request_id: str, file_data: bytes, model: 
 
 async def process_messages(message: ConsumerRecord, model: BasePredictionModel) -> None:
     """Process messages received from producer, by putting them in requests buffer.
-       If the whole file is received, make a prediction and send results back to producer."""
+       If the whole file is received, make a prediction and send results back to API server."""
 
     message_content = message.value
     file_chunk_request = FileChunkRequest(**message_content)
@@ -112,14 +112,15 @@ async def process_messages(message: ConsumerRecord, model: BasePredictionModel) 
         file_data = create_file_from_chunks(request_id, file_chunk_request.checksum)
     except BytesWarning:
         await _handle_checksum_mismatch_error(request_id)
+        remove_request_from_buffer(request_id)
     else:
         if file_data:
-            remove_request_from_buffer(request_id)
             await _perform_prediction_on_file(request_id, file_data, model, file_chunk_request.file_extension)
+            remove_request_from_buffer(request_id)
 
 
 async def run_consumer() -> None:
-    """Initialize Kafka and start consuming messages from server."""
+    """Initialize Kafka and start consuming messages from API server."""
 
     await initialize_kafka()
     request_receiver = await get_request_receiver()
@@ -137,7 +138,7 @@ async def main() -> None:
 
 
 if __name__ == '__main__':
-    logger.info('starting consumer...')
+    logger.info('starting server...')
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(main())
