@@ -8,6 +8,9 @@ from typing import AsyncGenerator, BinaryIO
 from aiokafka.structs import ConsumerRecord
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+import librosa
+import soundfile as sf
+
 from producer_setup import (
     CHUNK_SIZE,
     MessageKey,
@@ -45,6 +48,7 @@ async def get_file_data(file: UploadFile, request_id: str) -> FileData:
     
     file_content_type = file.content_type
     _validate_file_content_type(request_id, file_content_type)
+    _validate_audio_duration(file)
     file_data = await file.read()
     return FileData(
         file=file.file,
@@ -83,6 +87,20 @@ def _validate_file_content_type(request_id: str, file_content_type: str) -> None
     if 'audio/' not in file_content_type:
         logger.warning(f'Invalid file_content_type: {file_content_type} for {request_id=}')
         raise HTTPException(400, detail='Please upload audio file')
+
+
+def _validate_audio_duration(file: UploadFile) -> None:
+    """Validate audio duration. Raise HTTP exception if audio is less than 3s or more than 10min."""
+
+    MIN_DURATION_S = 3
+    MAX_DURATION_S = 10 * 60
+
+    sf_file = sf.SoundFile(file)
+    duration = librosa.get_duration(y=sf_file.read())
+    if MIN_DURATION_S < duration < MAX_DURATION_S:
+        return
+    
+    raise HTTPException(400, detail="Provided audio's duration should be longer than 3 seconds and less than 10 minutes.")
 
 
 def _get_file_extension(filename: str) -> str:
