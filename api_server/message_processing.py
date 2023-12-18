@@ -13,6 +13,8 @@ import soundfile as sf
 
 from producer_setup import (
     CHUNK_SIZE,
+    MAX_DURATION_S,
+    MIN_DURATION_S,
     MessageKey,
     get_request_sender,
     get_result_receiver)
@@ -91,9 +93,6 @@ def _validate_file_content_type(request_id: str, file_content_type: str) -> None
 
 def _validate_audio_duration(file: UploadFile) -> None:
     """Validate audio duration. Raise HTTP exception if audio is less than 3s or more than 10min."""
-
-    MIN_DURATION_S = 3
-    MAX_DURATION_S = 10 * 60
 
     sf_file = sf.SoundFile(file)
     duration = librosa.get_duration(y=sf_file.read())

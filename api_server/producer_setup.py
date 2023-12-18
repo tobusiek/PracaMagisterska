@@ -12,6 +12,10 @@ _result_receiver: AIOKafkaConsumer = None
 
 CHUNK_SIZE = 1024 * 1024
 
+MIN_DURATION_S = 3
+MAX_DURATION_S = 10 * 60
+
+
 
 class MessageKey(Enum):
     REQUEST_ID = 'request_id'
